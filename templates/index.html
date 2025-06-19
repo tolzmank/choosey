@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Choosey</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/flirty_smiley.png') }}">
+  <script src="{{ url_for('static', filename='script.js') }}"></script>
+  <link type="text/css" rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link href="https://fonts.googleapis.com/css2?family=Lobster&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Satisfy&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Pacifico&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+<div class="head-container" style="display: flex; align-items: center; gap: 10px;">
+  <img src="{{ url_for('static', filename='images/lady_choosey.png') }}" alt="Flirty Smiley" style="height: 100%; max-height: 150px; border-top-left-radius: 20px; border-bottom-left-radius: 20px;">
+  <div>
+    <h1>Choosey</h1>
+    <h2>Whatever you want...</h2>
+  </div>
+</div>
+
+{% if not story_set %}
+<div class="container">
+<form method="POST" action="/setup">
+  <table>
+    <thead>
+      <tr>
+        <th class="no-sort">Make the Story Yours</th>
+        <th class="no-sort">Your Turn to Choose</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>What's Your Flavor?</td>
+        <td>
+          <select class="bubble-input" name="genre" title="Your fantasy, your rules. Select the kind of story you’re dying to dive into.">
+            <option value="" disabled selected required>Select</option>
+            <option value="romantasy">Romantasy (Romantic Fantasy)</option>
+            <option value="erotic_romance">Erotic Romance</option>
+            <option value="taboo_romance">Taboo Romance</option>
+            <option value="romantic_thriller">Romantic Thriller</option>
+            <option value="romantic_comedy">Romantic Comedy (RomCom)</option>
+          </select>
+        </td>
+      </tr>
+      <tr>
+        <td>How long do you want it?</td>
+        <td>
+          <select class="bubble-input" name="length" title="Pick your pace — just a quicky or keep the story going and going?">
+            <option value="" disabled selected required>Select</option>
+            <option value="quicky">Quicky (Short & Sweet)</option>
+            <option value="novella">Slow Burn (Novella)</option>
+            <option value="novel">Deep Dive (Novel)</option>
+            <option value="epic">All In (Epic)</option>
+          </select>
+        </td>
+      </tr>
+      <tr>
+        <td>How much control do you want?</td>
+        <td>
+          <select class="bubble-input" name="control" title="How hands-on do you want to be with the story? Mostly sit back or taking full control?">
+            <option value="" disabled selected required>Select</option>
+            <option value="low">Let It Ride</option>
+            <option value="medium">A Little Control</option>
+            <option value="high">Driver's Seat</option>
+          </select>
+        </td>
+      </tr>
+      <tr>
+        <td>How Spicy are you feeling?</td>
+        <td>
+          <select class="bubble-input" name="spice" title="Mild tease or full sizzle? Set the steam level for your story">
+            <option value="" disabled selected required>Select</option>
+            <option value="mild">Sweetie (Mild)</option>
+            <option value="medium">Just Enough Heat (Medium)</option>
+            <option value="hot">Turn Up the Heat (Explicit)</option>
+          </select>
+        </td>
+      </tr>
+      <tr>
+        <td>Who do you want to be?</td>
+        <td>
+          <select class="bubble-input" name="persona" title="Pick your story persona">
+            <option value="" disabled selected required>Select</option>
+            <option value="sweetheart">Sweetheart (Loving & Loyal)</option>
+            <option value="badass">Badass (Bold & Fierce)</option>
+            <option value="flirt">Flirt (Charming & Teasing)</option>
+            <option value="brooding">Brooding (Dark & Deep)</option>
+            <option value="chaotic">Wildcard (Unpredictable & Fun)</option>
+          </select>
+        </td>
+      </tr>
+      <tr>
+        <td colspan="2"><button class="button" type="submit" style="margin-top: 10px;">Start Adventure</button></td>
+      </tr>
+    </tbody>
+  </table>
+</form>
+</div>
+{% else %}
+
+
+<div class="reader-container">
+  {% for plot_block in story_set['story'] %}
+  <p>{{plot_block['text']}}</p>
+  <div class="decision-row">
+    <form method="POST" action="/choose_path">
+      <input type="hidden" name="decision" value="{{plot_block['choices'][0]['decision']}}">
+      <input type="hidden" name="next" value="{{plot_block['choices'][0]['next']}}">
+      <button class="decision-button" type="submit">{{plot_block['choices'][0]['decision']}}</button>
+    </form>
+    <form method="POST" action="/choose_path">
+      <input type="hidden" name="decision" value="{{plot_block['choices'][1]['decision']}}">
+      <input type="hidden" name="next" value="{{plot_block['choices'][1]['next']}}">
+      <button class="decision-button" type="submit">{{plot_block['choices'][1]['decision']}}</button>
+    </form>
+    
+  </div>
+  {% endfor %}
+
+</div>
+  <div class="decision-row">
+    <form method="POST" action="/go_back">
+      <button class="button-gray" type="submit" title="Go back one step in your story">
+        <img src="{{ url_for('static', filename='icons/back.svg') }}" alt="Go Back" style="height: 30px;">
+      </button>
+    </form>
+    <form method="POST" action="/start_over">
+      <button class="button-gray" type="submit" title="Restart from the beginning with the same setup">
+        <img src="{{ url_for('static', filename='icons/start_over.svg') }}" alt="Start Over" style="height: 30px;">
+      </button>
+    </form>
+    <form method="POST" action="/reset">
+      <button class="button-gray" type="submit" title="Clear everything and begin a brand new story">
+        <img src="{{ url_for('static', filename='icons/close.svg') }}" alt="Reset" style="height: 30px;">
+      </button>
+    </form>
+  </div>
+
+{% endif %}
+
+<div id="loading-overlay" style="display:none;">
+  <div class="loading-spinner"></div>
+  <p style="color: white; font-family: 'Quicksand', sans-serif; margin-top: 20px;">Getting your fantasy ready...</p>
+</div>
+
+<script>
+  const forms = document.querySelectorAll('form');
+
+  forms.forEach(form => {
+    form.addEventListener('submit', function() {
+      const action = form.getAttribute('action');
+
+      // Save scroll position
+      localStorage.setItem('scrollPosition', window.scrollY);
+
+      if (action === '/setup') {
+        document.getElementById('loading-overlay').style.display = 'flex';
+      } else if (action === '/choose_path') {
+        const lastReaderContainer = document.querySelector('.reader-container');
+        const loadingDiv = document.createElement('div');
+        loadingDiv.className = 'local-loading';
+        loadingDiv.innerHTML = `
+          <div class="loading-spinner"></div>
+          <p style="color: #dbd9d9; font-family: 'Quicksand', sans-serif;">As you wish. Get Ready for more...</p>
+        `;
+        lastReaderContainer.appendChild(loadingDiv);
+      }
+    });
+  });
+
+  // Restore scroll position after reload
+window.addEventListener('load', () => {
+    const savedPosition = localStorage.getItem('scrollPosition');
+    if (savedPosition) {
+      // Detect height of any existing loading content
+      const loadingElement = document.querySelector('.local-loading');
+      const extraOffset = loadingElement ? loadingElement.offsetHeight : 0;
+
+      // Scroll to saved position plus the loading spinner height
+      window.scrollTo({
+        top: parseInt(savedPosition) + extraOffset,
+        behavior: 'auto'
+      });
+
+      localStorage.removeItem('scrollPosition');
+    }
+  });
+</script>
+
+
+</body>
+</html>
