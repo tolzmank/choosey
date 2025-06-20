@@ -10,29 +10,61 @@
   <link href="https://fonts.googleapis.com/css2?family=Pacifico&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body>
+
+  <!-- Title Block -->
 <div class="head-container" style="display: flex; align-items: center; gap: 10px;">
-  <img src="{{ url_for('static', filename='images/lady_choosey.png') }}" alt="Flirty Smiley" style="height: 100%; max-height: 150px; border-top-left-radius: 20px; border-bottom-left-radius: 20px;">
+  <img src="{{ url_for('static', filename='images/lady_choosey.png') }}" alt="Lady Choosey" style="height: 100%; max-height: 150px; border-top-left-radius: 20px; border-bottom-left-radius: 20px;">
   <div>
     <h1>Choosey</h1>
     <h2>Whatever you want...</h2>
   </div>
 </div>
 
+
+<!-- Menu Bar -->
+<div class="menu-container" style="display: flex; justify-content: center; align-items: center; padding: 10px 0;">
+  {% if not user %}
+  <button class="button-menu" onclick="location.href='/show_login'" title="Log in or create your account">Login / Create Account</button>
+  {% else %}
+  <button class="button-menu" style="margin-right: 10px;" onclick="location.href='/my_stories'" title="View all stories you've created">My Stories</button>
+  <button class="button-menu" style="margin-right: 10px;" onclick="location.href='/account_settings'" title="Update your account preferences">Account</button>
+    <button class="button-menu" style="margin-right: 10px;" onclick="location.href='/session_logout'" title="Logout">Logout</button>
+  <img src="{{ url_for('static', filename='images/flirty_smiley.png') }}" alt="Flirty Smiley" style="height: 100%; max-height: 22px;">
+  {% endif %}
+</div>
+
+
+<!-- Login/create account form -->
+{% if show_login %}
+<div class="menu-container" style="display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px 0;">
+  <h2>Login or Create Account</h2>
+  <input class="bubble-input" style="margin-top: 10px;" type="email" id="email" placeholder="Email" /><br>
+  <input class="bubble-input" style="margin-top: 10px;" type="password" id="password" placeholder="Password" /><br>
+  <button class="button" style="margin-top: 10px;" onclick="signIn()">Login</button>
+  <button class="button" style="margin-top: 10px;" onclick="googleSignIn()">Sign in with Google</button>
+  <button class="button-menu" style="margin-top: 10px;" onclick="signUp()">Create Account</button><br>
+  <button class="button-menu" style="margin-top: 10px;" onclick="location.href='/hide_login'" title="Hide Login Form">Cancel</button>
+  <p id="auth-message"></p>
+</div>
+{% else %}
+
+
+<!-- Story Settings Form -->
 {% if not story_set %}
 <div class="container">
-<form method="POST" action="/setup">
+<form method="POST" action="/create_story">
   <table>
     <thead>
       <tr>
         <th class="no-sort">Make the Story Yours</th>
-        <th class="no-sort">Your Turn to Choose</th>
       </tr>
     </thead>
     <tbody>
+      <tr><td style="padding-top: 20px;">What's Your Flavor?</td></tr>
       <tr>
-        <td>What's Your Flavor?</td>
         <td>
           <select class="bubble-input" name="genre" title="Your fantasy, your rules. Select the kind of story you’re dying to dive into.">
             <option value="" disabled selected required>Select</option>
@@ -44,8 +76,9 @@
           </select>
         </td>
       </tr>
+  
+      <tr><td style="padding-top: 20px;">How long do you want it?</td></tr>
       <tr>
-        <td>How long do you want it?</td>
         <td>
           <select class="bubble-input" name="length" title="Pick your pace — just a quicky or keep the story going and going?">
             <option value="" disabled selected required>Select</option>
@@ -56,8 +89,9 @@
           </select>
         </td>
       </tr>
+
+      <tr><td style="padding-top: 20px;">How much control do you want?</td></tr>
       <tr>
-        <td>How much control do you want?</td>
         <td>
           <select class="bubble-input" name="control" title="How hands-on do you want to be with the story? Mostly sit back or taking full control?">
             <option value="" disabled selected required>Select</option>
@@ -67,8 +101,9 @@
           </select>
         </td>
       </tr>
+        
+      <tr><td style="padding-top: 20px;">How Spicy are you feeling?</td></tr>
       <tr>
-        <td>How Spicy are you feeling?</td>
         <td>
           <select class="bubble-input" name="spice" title="Mild tease or full sizzle? Set the steam level for your story">
             <option value="" disabled selected required>Select</option>
@@ -78,8 +113,9 @@
           </select>
         </td>
       </tr>
+
+      <tr><td style="padding-top: 20px;">Who do you want to be?</td></tr>
       <tr>
-        <td>Who do you want to be?</td>
         <td>
           <select class="bubble-input" name="persona" title="Pick your story persona">
             <option value="" disabled selected required>Select</option>
@@ -90,10 +126,12 @@
             <option value="chaotic">Wildcard (Unpredictable & Fun)</option>
           </select>
         </td>
-      </tr>
+      </tr>  
+
       <tr>
-        <td colspan="2"><button class="button" type="submit" style="margin-top: 10px;">Start Adventure</button></td>
+        <td style="padding-bottom: 20px;"><button class="button" type="submit" style="margin-top: 10px;">Start Adventure</button></td>
       </tr>
+
     </tbody>
   </table>
 </form>
@@ -101,6 +139,7 @@
 {% else %}
 
 
+<!-- Story Reader -->
 <div class="reader-container">
   {% for plot_block in story_set['story'] %}
   <p>{{plot_block['text']}}</p>
@@ -118,33 +157,40 @@
     
   </div>
   {% endfor %}
-
 </div>
-  <div class="decision-row">
-    <form method="POST" action="/go_back">
-      <button class="button-gray" type="submit" title="Go back one step in your story">
-        <img src="{{ url_for('static', filename='icons/back.svg') }}" alt="Go Back" style="height: 30px;">
-      </button>
-    </form>
-    <form method="POST" action="/start_over">
-      <button class="button-gray" type="submit" title="Restart from the beginning with the same setup">
-        <img src="{{ url_for('static', filename='icons/start_over.svg') }}" alt="Start Over" style="height: 30px;">
-      </button>
-    </form>
-    <form method="POST" action="/reset">
-      <button class="button-gray" type="submit" title="Clear everything and begin a brand new story">
-        <img src="{{ url_for('static', filename='icons/close.svg') }}" alt="Reset" style="height: 30px;">
-      </button>
-    </form>
-  </div>
 
+
+<!-- Story Navigation Buttons -->
+<div class="decision-row">
+  <form method="POST" action="/go_back">
+    <button class="button-gray" type="submit" title="Go back one step in your story">
+      <img src="{{ url_for('static', filename='icons/back.svg') }}" alt="Go Back" style="height: 30px;">
+    </button>
+  </form>
+  <form method="POST" action="/start_over">
+    <button class="button-gray" type="submit" title="Restart from the beginning with the same setup">
+      <img src="{{ url_for('static', filename='icons/start_over.svg') }}" alt="Start Over" style="height: 30px;">
+    </button>
+  </form>
+  <form method="POST" action="/reset">
+    <button class="button-gray" type="submit" title="Clear everything and begin a brand new story">
+      <img src="{{ url_for('static', filename='icons/close.svg') }}" alt="Reset" style="height: 30px;">
+    </button>
+  </form>
+</div>
 {% endif %}
 
+<!-- Loading screen animation -->
 <div id="loading-overlay" style="display:none;">
   <div class="loading-spinner"></div>
   <p style="color: white; font-family: 'Quicksand', sans-serif; margin-top: 20px;">Getting your fantasy ready...</p>
 </div>
 
+<!-- Padding for bottom of screen -->
+<div style="height: 100px;"></div>
+{% endif %}
+
+<!-- Scroll position restore and loading animation script -->
 <script>
   const forms = document.querySelectorAll('form');
 
@@ -155,7 +201,7 @@
       // Save scroll position
       localStorage.setItem('scrollPosition', window.scrollY);
 
-      if (action === '/setup') {
+      if (action === '/create_story') {
         document.getElementById('loading-overlay').style.display = 'flex';
       } else if (action === '/choose_path') {
         const lastReaderContainer = document.querySelector('.reader-container');
@@ -166,6 +212,7 @@
           <p style="color: #dbd9d9; font-family: 'Quicksand', sans-serif;">As you wish. Get Ready for more...</p>
         `;
         lastReaderContainer.appendChild(loadingDiv);
+        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
       }
     });
   });
@@ -189,6 +236,106 @@ window.addEventListener('load', () => {
   });
 </script>
 
+<!-- Firebase SDKs -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-app.js";
+  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-auth.js";
+  import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-analytics.js";
+  import { GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  
+  const firebaseConfig = {
+    apiKey: "AIzaSyCqgEU3MC99RRiJcFnh6qZu7cqm2mzH-j0",
+    authDomain: "choosey-463422.firebaseapp.com",
+    projectId: "choosey-463422",
+    storageBucket: "choosey-463422.appspot.com",
+    messagingSenderId: "972281558326",
+    appId: "1:972281558326:web:4183dcadbd95da4e2c2f97",
+    measurementId: "G-X9R8NWZX3G"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const analytics = getAnalytics(app);
+  const auth = getAuth(app);
+  window.auth = auth;
+
+  window.signUp = function () {
+    const email = document.getElementById("email").value;
+    const password = document.getElementById("password").value;
+    createUserWithEmailAndPassword(auth, email, password)
+      .then((userCredential) => {
+        const user = userCredential.user;
+        return user.getIdToken(/* forceRefresh */ true);
+      })
+      .then((idToken) => {
+        return fetch('/session_login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ idToken })
+        });
+      })
+      .then((response) => {
+        if (response.ok) {
+          window.location.reload(); // session now set
+        }
+      })
+      .catch((error) => {
+        document.getElementById("auth-message").textContent = `Error: ${error.message}`;
+      });
+  };
+
+  window.signIn = function () {
+    const email = document.getElementById("email").value;
+    const password = document.getElementById("password").value;
+    signInWithEmailAndPassword(auth, email, password)
+      .then((userCredential) => {
+        const user = userCredential.user;
+        return user.getIdToken(/* forceRefresh */ true);
+      })
+      .then((idToken) => {
+        return fetch('/session_login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ idToken })
+        });
+      })
+      .then((response) => {
+        if (response.ok) {
+          window.location.reload(); // session now set
+        }
+      })
+      .catch((error) => {
+        document.getElementById("auth-message").textContent = `Error: ${error.message}`;
+      });
+  };
+
+  window.googleSignIn = function () {
+    const provider = new GoogleAuthProvider();
+    signInWithPopup(auth, provider)
+      .then((result) => {
+        const user = result.user;
+        // Send token to Flask backend
+        return user.getIdToken();
+      })
+      .then((idToken) => {
+        return fetch('/session_login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ idToken })
+        });
+      })
+      .then((response) => {
+        if (response.ok) {
+          window.location.reload();
+        } else {
+          throw new Error("Session login failed.");
+        }
+      })
+      .catch((error) => {
+        document.getElementById("auth-message").textContent = `Google Sign-in Error: ${error.message}`;
+      });
+  };
+
+</script>
 
 </body>
 </html>

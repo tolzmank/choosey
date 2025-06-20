@@ -90,6 +90,14 @@ select {
   box-shadow: 4px 4px 8px rgba(0, 0, 0, 0.2);
 }
 
+.menu-container {
+  width: 100%;
+  margin: 15px auto;
+  background-color: #1d1d1d;
+  border-radius: 20px;
+  box-shadow: 4px 4px 8px rgba(0, 0, 0, 0.2);
+}
+
 .reader-container {
   width: 100%;
   margin: 15px auto;
@@ -154,7 +162,6 @@ select {
 
 .button-gray {
   background-color: #1d1d1d;
-  
   border: none;
   color: #595858;
   padding: 10px 20px;
@@ -167,6 +174,22 @@ select {
 .button-gray:hover {
   background-color: #2a2a2a;
   color: #919191;
+}
+
+.button-menu {
+  background-color: #1d1d1d;
+
+  border: none;
+  color: #FF4F81;
+  padding: 2px 5px;
+  font-size: 16px;
+  border-radius: 15px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: filter 0.2s ease, color 0.2s ease;
+}
+.button-menu:hover {
+  filter: drop-shadow(0 0 2px #FF4F81);
 }
 
 .button-heart {
@@ -218,7 +241,7 @@ th {
 }
 
 td {
-  padding: 12px 16px;
+  padding: 5px 16px;
   text-align: left;
   /*border-bottom: 1px solid #FF4F81;*/
 }
