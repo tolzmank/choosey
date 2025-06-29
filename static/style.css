@@ -1,6 +1,6 @@
 body {
   background-color: #191919;
-  color: #333;
+  color: #7f7f7f;
   font-family: Arial, sans-serif;
   margin-left: 10px;
   margin-right: 10px;
@@ -57,6 +57,10 @@ h6 {
   font-size: larger;
 }
 
+p {
+  color:#c3c3c3;
+}
+
 input {
   font-size: 1em;
   padding: 2px 3px;
@@ -85,7 +89,9 @@ select {
 .head-container {
   width: 100%;
   margin: 15px auto;
-  background-color: #353535;
+  /*background-color: #353535;*/
+  background-color: #2f2f2f;
+  color: #7f7f7f;
   border-radius: 20px;
   box-shadow: 4px 4px 8px rgba(0, 0, 0, 0.2);
 }
@@ -101,12 +107,15 @@ select {
 .reader-container {
   width: 100%;
   margin: 15px auto;
-  background-color: #353535;
+  /*background-color: #353535;*/
+  background-color: #2f2f2f;
   border-radius: 20px;
   box-shadow: 4px 4px 8px rgba(0, 0, 0, 0.2);
   color: #dbd9d9;
   padding: 20px;
   box-sizing: border-box;
+  font-size: 16px;
+  line-height: 1.5;
 }
 
 .decision-row {
@@ -176,6 +185,23 @@ select {
   color: #919191;
 }
 
+.button-gray-trans {
+  background-color: transparent;
+  border: none;
+  color: #595858;
+  padding: 10px 20px;
+  font-size: 16px;
+  border-radius: 15px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.button-gray-trans:hover {
+  background-color: #2a2a2a;
+  color: #919191;
+}
+
+
 .button-menu {
   background-color: #1d1d1d;
 
@@ -190,6 +216,22 @@ select {
 }
 .button-menu:hover {
   filter: drop-shadow(0 0 2px #FF4F81);
+}
+
+
+.delete-button {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+.delete-icon {
+  width: 20px;
+  height: auto;
+  transition: filter 0.2s ease;
+}
+.delete-button:hover .delete-icon {
+  filter: brightness(0.6);
 }
 
 .button-heart {
@@ -229,7 +271,7 @@ input::placeholder {
 table {
   width: 100%;
   border-collapse: collapse;
-  background-color: #353535;
+  background-color: #2f2f2f;
   color: #dbdbdb;
   border-radius: 20px;
   overflow: hidden;
@@ -258,6 +300,18 @@ td:hover {
 th {
   background-color: #FF4F81;
   color: white;
+}
+
+
+table tbody a {
+  color: #dbdbdb;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+table tbody a:hover {
+  color: #FF4F81;
+  text-decoration: underline;
 }
 
 
@@ -316,4 +370,108 @@ th:not(.sorttable_sorted):not(.sorttable_sorted_reverse):hover::after {
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
+}
+
+#user_email {
+  background-color: #353535;
+  color: #6d6d6d;
+}
+
+/* Light theme overrides */
+body.light-theme {
+  background-color: #f7f7f7;
+  color: #222;
+}
+
+body.light-theme a,
+body.light-theme p,
+body.light-theme h2,
+body.light-theme .head-container,
+body.light-theme .menu-container,
+body.light-theme .container,
+body.light-theme .reader-container,
+body.light-theme table {
+  background-color: #ebebeb;
+  color: #212121;
+}
+
+body.light-theme #user_email {
+  background-color: #c9c9c9;
+  color: #6d6d6d;
+
+}
+
+body.light-theme .decision-button,
+body.light-theme .button-gray {
+  background-color: #dedcdc;
+  color: #212121;
+}
+body.light-theme .decision-button:hover {
+  background-color: #FF4F81;
+}
+body.light-theme .button-gray-trans:hover,
+body.light-theme .button-gray:hover {
+  background-color: #cecece;
+}
+
+
+
+body.light-theme .button-menu {
+  color: #FF4F81;
+  background-color: #ebebeb;
+  transition: filter 0.2s ease, color 0.2s ease;
+}
+body.light-theme .button-menu:hover {
+  filter: drop-shadow(0 0 2px #FF4F81);
+}
+
+
+body.light-theme .decision-button,
+body.light-theme .button,
+body.light-theme .button-gray,
+body.light-theme .button-menu {
+  filter: invert(0);
+}
+/* Theme toggle button alignment */
+#toggle-theme {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px; /* space between icon and text */
+}
+
+#toggle-theme img {
+  vertical-align: middle;
+}
+
+.reader-container {
+  position: relative; /* ensure positioning context */
+}
+
+#text-controls {
+  position: sticky;
+  top: 0; /* sticks to top of its container */
+  background-color: #2f2f2f; /* match reader-container background */
+  padding: 8px 0; /* vertical padding for comfort */
+  z-index: 10; /* ensure it stays above text */
+}
+
+
+/* Make the sticky controls bar light when in light‐mode */
+body.light-theme #text-controls {
+  background-color: #ebebeb;   /* match your other light‐panels */
+}
+
+/* And tweak the buttons so they remain visible */
+body.light-theme #text-controls button {
+  color: #212121;              /* dark text/icons */
+}
+body.light-theme #text-controls button:hover {
+  background-color: #dedcdc;   /* light hover state */
+}
+
+
+/* Ensure loading-overlay text remains transparent in light mode */
+body.light-theme #loading-overlay p {
+  background-color: transparent !important;
+  color: #ffffff !important; /* keep spinner text white for contrast */
 }
