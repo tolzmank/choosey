@@ -1,21 +1,9 @@
 Flask==3.0.0
-python-jose
-six
-requests
-authlib
-BeautifulSoup
-openai
-selenium
 
-pillow
-pytesseract
-pyautogui
-opencv-python
-numpy
-pyobjc-core
-pyobjc-framework-Vision
-pyobjc-framework-Quartz
+requests
+openai
 
 gunicorn==20.1.0
 google-cloud-datastore==2.5.0
 protobuf==3.20.1
+firebase-admin

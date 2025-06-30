@@ -43,6 +43,16 @@
   {% endif %}
 </div>
 
+<!-- Flash messages for user feedback -->
+{% with messages = get_flashed_messages() %}
+  {% if messages %}
+    <div class="menu-container" style="padding: 2px;">
+      {% for message in messages %}
+        <p style="text-align: center;">{{ message }}</p>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
 
 <!-- Login/create account form -->
 {% if show_login %}
@@ -304,6 +314,8 @@
           <button class="decision-button" style="margin-bottom: 15px;" type="submit">{{plot_block['choices'][1]['decision']}}</button>
         </form>
       </div>
+    {% else %}
+    <p style="font-weight:700; text-align: center;">The End</p>
     {% endif %}
   {% endif %}
     

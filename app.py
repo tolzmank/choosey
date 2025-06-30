@@ -1,9 +1,5 @@
 
 import os
-import random
-import re
-import threading
-import time
 import uuid
 from datetime import datetime, timezone, timedelta
 import pytz
@@ -241,8 +237,11 @@ def session_login():
         entity = ds_client.get(key) or datastore.Entity(key=key)
         entity['name'] = name
         entity['birthdate'] = birthdate
-        ds_client.put(entity)
-
+        try:
+            ds_client.put(entity)
+        except Exception as e:
+            print("Datastore save failed:", e)
+            flash("Something went wrong saving your story. Please try again.")
     session['user_profile'] = get_user_profile(user)
     print('LOGIN Requested: ', session['user_profile']['name'])
     session.pop('show_login_form', False)
@@ -322,7 +321,11 @@ def save_story_anonymous(story_set):
             'created_at': datetime.now(timezone.utc),
             'last_modified': datetime.now(timezone.utc)
         })
-        ds_client.put(entity)
+        try:
+            ds_client.put(entity)
+        except Exception as e:
+            print("Datastore save failed:", e)
+            flash("Something went wrong saving your story. Please try again.")
         story_id = entity.key.id
         return story_id
 
@@ -345,7 +348,11 @@ def save_story_db(story_set):
             'last_modified': datetime.now(timezone.utc),
             'user': user
         })
-        ds_client.put(entity)
+        try:
+            ds_client.put(entity)
+        except Exception as e:
+            print("Datastore save failed:", e)
+            flash("Something went wrong saving your story. Please try again.")
         print('Story saved with ID:', entity.key.id)
         story_id = entity.key.id
         return story_id
@@ -372,7 +379,11 @@ def update_story_db(story_id, story_set):
     if entity:
         entity['story'] = json.dumps(story_set['story'])
         entity['last_modified'] = datetime.now(timezone.utc)
-        ds_client.put(entity)
+        try:
+            ds_client.put(entity)
+        except Exception as e:
+            print("Datastore save failed:", e)
+            flash("Something went wrong saving your story. Please try again.")
         print('Story updated with ID:', story_id)
 
 
@@ -651,8 +662,8 @@ def get_next_story_block(story_set, choice=None):
             The reader chose to:
             \"{user_choice}\"
 
-
             Write the next part of the story ({paragraphs_per_block} paragraphs), continuing naturally from the reader's choice.
+            This block should reflect the current arc: build tension toward the climax. The final conclusion should resolve within the last {paragraphs_per_block} paragraphs.
             Let the reader's choice guide the continuation of the next part of the story you are writing now. But make sure the explicitness and graphic detail is {spice}
 
             Important:
@@ -674,7 +685,7 @@ def get_next_story_block(story_set, choice=None):
         But keep in mind the overall story intro, arc, and conclusion in the future will still be limited to {total_paragraphs} So ensure the plot structure follows this pace.
 
         Make sure the explicitness and graphic detail is {spice}
-        
+
         """.strip()
 
 
@@ -692,7 +703,7 @@ def get_next_story_block(story_set, choice=None):
 
         Respond ONLY with a valid JSON object like this (replace the placeholder values of 'Choice A' and 'Choice B' in the JSON object example with the actual brief descriptions of each choice.):
         - Do NOT use generic placeholders such as "Choice A" or "Choice B". Each "decision" value must be a clear, descriptive option reflecting the actual branch.
-        - For the summary: Think: “From the very beginning of the tale through the end of this block, what is the one‐paragraph plot overview?” Do **not** summarize only the paragraphs you just wrote—summarize the entire arc so far.  
+        - For the summary: Think: “From the very beginning of the tale through the end of this block, what is the one‐paragraph full plot arc?” Do **not** summarize only the paragraphs you just wrote—summarize the entire arc so far.  
 
         {{
         "text": "Your story content here in {paragraphs_per_block} paragraphs...",
@@ -707,7 +718,7 @@ def get_next_story_block(story_set, choice=None):
     """.strip()
 
     #check_moderation(STATIC_SYSTEM_INSTRUCTIONS)
-    print('STATIC: ', STATIC_SYSTEM_INSTRUCTIONS)
+    #print('STATIC: ', STATIC_SYSTEM_INSTRUCTIONS)
     print()
     print('PROMPT: ', prompt)
 
@@ -722,14 +733,17 @@ def get_next_story_block(story_set, choice=None):
     )
     try:
         text = response.choices[0].message.content
+        if not text:
+            flash("Oops! Something went wrong. Try selecting your choice again to continue your story.")
+            raise ValueError("OPenAI response returned no content.")
         story_block = json.loads(text)
-    except json.JSONDecodeError as e:
+    except (json.JSONDecodeError, TypeError, ValueError) as e:
         print("JSON parsing error:", e)
         print("Response text was:", text)
+        flash("Oops! Something went wrong. Try selecting your choice again to continue your story.")
         return story_set
     
     story_set['story'].append(story_block)
-    #print("SUMMARY: ", story_set['story'][-1]['summary'])
     return story_set
 
 
