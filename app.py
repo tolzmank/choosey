@@ -102,7 +102,6 @@ def show_create_story_page():
     return redirect(url_for('index'))
 
 
-
 @app.route('/my_stories', methods=['GET'])
 def my_stories():
     session['show_stories'] = True
@@ -274,7 +273,14 @@ def session_login():
                 print("Datastore save failed:", e)
                 flash("Something went wrong saving your story. Please try again.")
         session.pop('anon_id', None)
-        
+    if session.get('hold_story_id'):
+        session['show_create'] = False
+        session['show_stories'] = False
+        session['show_account'] = False
+        session['story_id'] = session.get('hold_story_id')
+        session.pop('hold_story_id')
+    else:
+        session['show_create'] = True
     return redirect(url_for('index'))
 
 
