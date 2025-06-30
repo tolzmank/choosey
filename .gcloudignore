@@ -1,0 +1,19 @@
+# Always ignore version control
+.git/
+__pycache__/
+
+# Ignore secrets
+.env
+choosey-463422-firebase-adminsdk.json
+
+# Ignore scratch and test files
+scratch1.py
+scratch2.py
+scratch3.py
+hold_code.py
+tests/
+backups/
+
+# Ignore editor folders
+.vscode/
+.idea/

@@ -9,18 +9,24 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Google Cloud Datastore
-from google.cloud import datastore
+from google.cloud import datastore, secretmanager
 ds_client = datastore.Client(project="choosey-463422")
 
+# Firebase Authentication
 import firebase_admin
 from firebase_admin import auth as firebase_auth, credentials
 
-cred = credentials.Certificate('choosey-463422-firebase-adminsdk.json')
+client = secretmanager.SecretManagerServiceClient()
+secret_name = os.environ["FIREBASE_ADMIN_CREDENTIALS"]
+response = client.access_secret_version(request={"name": secret_name})
+secret_payload = response.payload.data.decode("UTF-8")
+
+cred_dict = json.loads(secret_payload)
+cred = credentials.Certificate(cred_dict)
 firebase_admin.initialize_app(cred)
 
 
-# OpenAI for answer bot
-#from openai.types.chat import ChatCompletionMessage
+# OpenAI
 from openai import OpenAI
 openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
@@ -69,6 +75,7 @@ def show_login():
     session['show_stories'] = False
     session['show_create'] = False
     session['show_account'] = False
+    session['hold_story_id'] = session.get('story_id')
     session.pop('story_id', None)
     return redirect(url_for('index'))
 
@@ -76,7 +83,14 @@ def show_login():
 @app.route('/hide_login', methods=['GET'])
 def hide_login():
     session['show_login_form'] = False
-    session['show_create'] = True
+    if session.get('hold_story_id'):
+        session['show_create'] = False
+        session['show_stories'] = False
+        session['show_account'] = False
+        session['story_id'] = session.get('hold_story_id')
+        session.pop('hold_story_id')
+    else:
+        session['show_create'] = True
     return redirect(url_for('index'))
 
 
@@ -245,6 +259,22 @@ def session_login():
     session['user_profile'] = get_user_profile(user)
     print('LOGIN Requested: ', session['user_profile']['name'])
     session.pop('show_login_form', False)
+
+    # Add any anonymously created stories to a newly created/logged in user
+    anon_id = session.get('anon_id')
+    if anon_id:
+        query = ds_client.query(kind='Story')
+        query.add_filter('anon_id', '=', anon_id)
+        for entity in query.fetch():
+            entity['user'] = session['user']
+            entity['anon_id'] = None
+            try:
+                ds_client.put(entity)
+            except Exception as e:
+                print("Datastore save failed:", e)
+                flash("Something went wrong saving your story. Please try again.")
+        session.pop('anon_id', None)
+        
     return redirect(url_for('index'))
 
 
@@ -273,6 +303,10 @@ def get_user_profile(user):
 @app.route('/create_story', methods=['POST'])
 def create_story():
     user = session.get('user')
+    #max_anon_paragraphs = 40
+    #if not user:
+    #    if session['anon_paragraphs_count'] > max_anon_paragraphs:
+    #        flash("Log in/Sign up to create and save more stories!")
 
     genre = request.form.get('genre')
     relationship_type = request.form.get('relationship_type')
@@ -296,36 +330,46 @@ def create_story():
     story_set['title'] = story_set['story'][0]['title']
     del story_set['story'][0]['title']
 
-    #if user:
-    #    story_id = save_story_db(story_set)
-    #    session['story_id'] = story_id
-    #else:
+    if user:
+        story_id = save_story_db(story_set)
+    else:
         # store as anonymous user
+        story_id = save_story_anonymous(story_set)
 
-    story_id = save_story_db(story_set)
+    #story_id = save_story_db(story_set)
     session['story_id'] = story_id
     session['show_create'] = False
-    return render_template('index.html', user=user, story_set=story_set)
+    return redirect(url_for('index'))
+    #return render_template('index.html', user=user, story_set=story_set)
 
 
 def save_story_anonymous(story_set):
 # generate or reuse anonymous ID
-        anon_id = session.get('anon_id') or str(uuid.uuid4())
-        session['anon_id'] = anon_id
+    anon_id = session.get('anon_id') or str(uuid.uuid4())
+    session['anon_id'] = anon_id
 
-        # save JSON-encoded story text in Datastore
-        key = ds_client.key('AnonStory', anon_id)
-        entity = datastore.Entity(key=key, exclude_from_indexes=['story'])
+    if story_set:
+        entity = datastore.Entity(key=ds_client.key('Story'), exclude_from_indexes=['story'])
         entity.update({
+            'title': story_set['title'],
+            'genre': story_set['genre'],
+            'relationship_type': story_set['relationship_type'],
+            'length': story_set['length'],
+            'control': story_set['control'],
+            'spice': story_set['spice'],
+            'persona': story_set['persona'],
+            'romantic_interest_personality': story_set['romantic_interest_personality'],
             'story': json.dumps(story_set['story']),
             'created_at': datetime.now(timezone.utc),
-            'last_modified': datetime.now(timezone.utc)
+            'last_modified': datetime.now(timezone.utc),
+            'anon_id': anon_id
         })
         try:
             ds_client.put(entity)
         except Exception as e:
             print("Datastore save failed:", e)
             flash("Something went wrong saving your story. Please try again.")
+        print('Story saved with ID:', entity.key.id)
         story_id = entity.key.id
         return story_id
 
@@ -370,7 +414,8 @@ def choose_path():
     story_set = get_next_story_block(story_set, choice)
 
     update_story_db(story_id, story_set)
-    return render_template('index.html', user=user, story_set=story_set)
+    return redirect(url_for('index'))
+    #return render_template('index.html', user=user, story_set=story_set)
 
 
 def update_story_db(story_id, story_set):
@@ -442,7 +487,6 @@ def get_all_stories_for_user():
     query.add_filter('user', '=', user)
     all_stories = list(query.fetch())
     sorted_stories = sorted(all_stories, key=lambda x: x.get('last_modified'), reverse=True)
-    #query.order = ["last_modified"]
     return sorted_stories
 
 
@@ -531,7 +575,7 @@ def map_user_set(story_set):
     author_type = author_type_map.get(story_set['spice'])
 
     persona_map = {
-        "sweetheart": "Sweetheart: Warm, innocent -  but eager for more temptation.",
+        "sweetheart": "Sweetheart: Warm, innocent -  but eager for more temptation. ",
         "badass": "Badass: Bold, sarcastic fierce.",
         "flirt": "Flirt: Playful, magnetic, witty.",
         "brooding": "Brooding: Guarded, intense, slow to trust.",
@@ -583,7 +627,7 @@ def get_next_story_block(story_set, choice=None):
     username = ''
     if userprofile:
         username = userprofile['name']
-    print(f'{username}: Getting story block...')
+    print(f'{username or "Anon"}: Getting story block...')
     user_set = map_user_set(story_set)
     genre = user_set['genre']
     relationship_type = user_set['relationship_type']
@@ -719,8 +763,8 @@ def get_next_story_block(story_set, choice=None):
 
     #check_moderation(STATIC_SYSTEM_INSTRUCTIONS)
     #print('STATIC: ', STATIC_SYSTEM_INSTRUCTIONS)
-    print()
-    print('PROMPT: ', prompt)
+    #print()
+    #print('PROMPT: ', prompt)
 
     response = openai_client.chat.completions.create(
         model="gpt-4o",
@@ -762,7 +806,7 @@ def check_moderation(input_text: str):
 # cron handler to remove non registered account user's stories from database (triggered daily)
 @app.route('/cron/cleanup_anonymous', methods=['GET'])
 def cleanup_anonymous():
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
     q = ds_client.query(kind='Story')
     q.add_filter('user', '=', None)
     q.add_filter('created_at', '<', cutoff)

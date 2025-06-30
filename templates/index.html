@@ -268,7 +268,11 @@
     </tbody>
   </table>
 </form>
-{% if not user %}<p style="margin-top: 0px; padding-bottom: 20px; padding-left: 20px;">Login or create an account to save your stories</p>{% endif %}
+{% if not user %}
+      <div style="text-align: center; margin-top: 20px;">
+      <button class="button-gray" style="background-color: transparent; color: #7f7f7f; padding-left: 20px; margin-bottom: 10px;" onclick="location.href='/show_login'" title="Login or create an account to save your stories">Login or create an account to save your stories</button>
+    </div>
+  {% endif %}
 </div>
 {% endif %}
 
@@ -321,9 +325,9 @@
     
   {% endfor %}
   {% if not user %}
-  <p style="margin-top: 20px; color: #7f7f7f; text-align: center;">
-    Login or create an account to save your stories
-  </p>
+    <div style="text-align: center; margin-top: 20px;">
+      <button class="button-gray" style="background-color: transparent; color: #7f7f7f; padding-left: 20px; margin-bottom: 10px;" onclick="location.href='/show_login'" title="Login or create an account to save your stories">Login or create an account to save your stories</button>
+    </div>
   {% endif %}
 </div>
 
