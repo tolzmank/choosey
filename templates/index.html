@@ -16,9 +16,10 @@
   </script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
+
+
 <body>
 
-  
   <!-- Title Block -->
 <div class="head-container" style="display: flex; align-items: center; gap: 10px;">
   <img src="{{ url_for('static', filename='images/lady_choosey.png') }}" alt="Lady Choosey" style="height: 100%; max-height: 150px; border-top-left-radius: 20px; border-bottom-left-radius: 20px;">
@@ -185,7 +186,7 @@
       <tr><td style="padding-top: 20px;">Choose Your Entanglement</td></tr>
       <tr>
         <td>
-          <select class="bubble-input" name="relationship_type" title="Tangled up in love? Pick the kind of relationship chaos—or clarity—you’re craving.">
+          <select class="bubble-input" name="relationship_type" title="Pick the kind of relationship chaos—or clarity—you’re craving.">
             <option value="" disabled selected required>Select</option>
             <option value="traditional">Traditional</option>
             <option value="reverse_harem">Reverse Harem</option>
@@ -225,7 +226,7 @@
       <tr><td style="padding-top: 20px;">How Spicy are you feeling?</td></tr>
       <tr>
         <td>
-          <select class="bubble-input" name="spice" title="Mild tease or full sizzle? Set the steam level for your story">
+          <select class="bubble-input" name="spice" title="Mild tease or full sizzle? Set the explicitness level for your story.">
             <option value="" disabled selected required>Select</option>
             <option value="mild">Sweetie (Mild)</option>
             <option value="medium">Just Enough Heat (Medium)</option>
@@ -251,7 +252,7 @@
       <tr><td style="padding-top: 20px;">Heartthrob Flavor Profile</td></tr>
       <tr>
         <td>
-          <select class="bubble-input" name="romantic_interest_personality" title="From golden retriever energy to guarded heartthrobs with hidden depths—choose your ideal love interest vibe.">
+          <select class="bubble-input" name="romantic_interest_personality" title="Choose your ideal love interest vibe.">
             <option value="" disabled selected required>Select</option>
             <option value="protector">Protector</option>
             <option value="rogue">Rogue</option>
