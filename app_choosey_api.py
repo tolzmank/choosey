@@ -12,6 +12,8 @@ import json
 from dotenv import load_dotenv
 load_dotenv()
 
+import stripe
+
 # Google Cloud Datastore
 from google.cloud import datastore, secretmanager
 ds_client = datastore.Client(project="choosey-463422")
@@ -31,6 +33,17 @@ cred_dict = json.loads(secret_payload)
 cred = credentials.Certificate(cred_dict)
 firebase_admin.initialize_app(cred)
 
+# Stripe secret key from Google Secret Manager
+stripe_response = client.access_secret_version(request={"name": os.environ["STRIPE_API_KEY"]})
+stripe.api_key = stripe_response.payload.data.decode("UTF-8")
+
+stripe_response = client.access_secret_version(request={"name": os.environ["STRIPE_PRICE_ID"]})
+STRIPE_PRICE_ID = stripe_response.payload.data.decode("UTF-8")
+
+stripe_response = client.access_secret_version(request={"name": os.environ["STRIPE_WEBHOOK"]})
+STRIPE_WEBHOOK = stripe_response.payload.data.decode("UTF-8")
+
+
 # OpenAI
 from openai import OpenAI
 openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -44,6 +57,160 @@ CORS(app)
 @app.route('/')
 def index():
     return jsonify({'status': 'Choosey API is running'})
+
+
+def set_user_unlimited(user_id, source="stripe", subscription_id=None, expiry_dt=None, promo_code=None):
+    key = ds_client.key('UserProfile', user_id)
+    profile = ds_client.get(key) or datastore.Entity(key=key)
+    profile['sub_status'] = 'unlimited'
+    profile['sub_source'] = 'source'
+    if subscription_id:
+        profile['sub_status'] = 'unlimited'
+        profile['sub_source'] = source
+    if expiry_dt:
+        profile['sub_expiry'] = expiry_dt
+    if promo_code:
+        profile['promo_code'] = promo_code
+    ds_client.put(profile)
+    return profile
+
+
+@app.route('/api/v1/create_checkout_session', methods=['POST'])
+def create_checkout_session():
+    # Check for Authorization header. Only call get_user_id() if present.
+    auth_header = request.headers.get('Authorization')
+    if auth_header:
+        user, error = get_user_id()
+        if error:
+            return error
+    else:
+        user = None
+    data = request.get_json() or {}
+    success_url = data.get('success_url') or (os.getenv('FRONTEND_URL', 'http://localhost:3000') + '/account_page?success=true')
+    cancel_url = data.get('cancel_url') or (os.getenv('FRONTEND_URL', 'http://localhost:3000') + '/account_page?canceled=true')
+    if not STRIPE_PRICE_ID:
+        return jsonify({'error': 'Stripe price not configured'}), 500
+    try:
+
+        client_reference_id = data.get('uid')
+        checkout_session = stripe.checkout.Session.create(
+            mode='subscription',
+            line_items=[{'price': STRIPE_PRICE_ID, 'quantity': 1}],
+            allow_promotion_codes=True,
+            success_url=success_url,
+            cancel_url=cancel_url,
+            client_reference_id=client_reference_id,
+        )
+        return jsonify({'id': checkout_session.id, 'url': checkout_session.url}), 200
+    except Exception as e:
+        logging.exception('Stripe checkout session creation failed')
+        return jsonify({'error': str(e)}), 400
+
+
+@app.route("/api/v1/create_customer_portal_session", methods=["POST"])
+def create_customer_portal_session():
+    data = request.get_json()
+    customer_id = data.get("customer_id")
+
+    session = stripe.billing_portal.Session.create(
+        customer=customer_id,
+        return_url="https://yourdomain.com/account_page"  # where they go back after managing billing
+    )
+    return jsonify({ "url": session.url })
+
+
+@app.route('/api/v1/stripe_webhook', methods=['POST'])
+def stripe_webhook():
+    print('STRIPE WEBHOOK TRIGGERED >>>')
+    payload = request.data
+    sig_header = request.headers.get('Stripe-Signature', '')
+    try:
+        if STRIPE_WEBHOOK:
+            event = stripe.Webhook.construct_event(payload=payload, sig_header=sig_header, secret=STRIPE_WEBHOOK)
+        else:
+            event = json.loads(payload.decode('utf-8'))
+    except Exception as e:
+        logging.error(f'Webhook verification failed: {e}')
+        return ('', 400)
+    
+    event_type = event.get('type')
+    data_obj = event.get('data', {}).get('object', {})
+    print(f'EVENT TYPE: {event_type}')
+    if event_type == 'checkout.session.completed' and data_obj.get('mode') == 'subscription':
+        # Use client_reference_id as the Firebase UID
+        uid = data_obj.get('client_reference_id')
+        subscription_id = data_obj.get('subscription')
+        discounts = data_obj.get('discounts', [])
+        expiry_dt = None
+        promo_code = None
+        try:
+            if subscription_id:
+                sub = stripe.Subscription.retrieve(subscription_id)
+                cpe = sub.get('current_period_end')
+                if cpe:
+                    expiry_dt = datetime.fromtimestamp(int(cpe), tz=timezone.utc)
+                if discounts:
+                    promo_id = discounts[0].get('promotion_code')
+                    if promo_id:
+                        promo = stripe.PromotionCode.retrieve(promo_id)
+                        promo_code = promo.get('code')
+        except Exception as e:
+            logging.error(f'Failed to retrieve subscription {subscription_id}: {e}')
+        if uid:
+            set_user_unlimited(uid, source='stripe', subscription_id=subscription_id, expiry_dt=expiry_dt, promo_code=promo_code)
+            return ('', 200)
+        else:
+            logging.warning("Stripe webhook: No client_reference_id (Firebase UID) found in checkout.session.completed event")
+        # fallback: nothing more to do
+        return ('', 200)
+    
+    # if event_type == 'checkout.session.expired':
+    #     uid = data_obj.get('client_reference_id')
+    #     if uid:
+    #         # Delete Firebase user
+    #         try:
+    #             firebase_auth.delete_user(uid)
+    #         except Exception as e:
+    #             print(f"Error deleting Firebase user: {e}")
+    #         try:
+    #             # Delete all stories for user
+    #             query = ds_client.query(kind='Story')
+    #             query.add_filter('user', '=', uid)
+    #             keys = [entity.key for entity in query.fetch()]
+    #             if keys:
+    #                 ds_client.delete_multi(keys)
+    #         except Exception as e:
+    #             logging.error(f'Error deleting storeis for user {uid}: {e}')
+    #         try:
+    #             # Delete the user's profile entry
+    #             profile_key = ds_client.key('UserProfile', uid)
+    #             ds_client.delete(profile_key)
+    #         except Exception as e:
+    #             logging.error(f'Error deleting UserProfile for user {uid}: {e}')
+    #     else:
+    #         logging.warning("stripe webhook: No client_reference_id (Firebase UID) found in checkout.session.expired event")
+    #     return ('', 200)
+
+    # Handle cancellations or non-payment
+    if event_type in ('customer.subscription.deleted', 'customer.subscription.updated'):
+        subscription = data_obj
+        subscription_id = subscription.get('id')
+        status = subscription.get('status')
+        if status == 'canceled':
+            try:
+                query = ds_client.query(kind='UserProfile')
+                query.add_filter('sub_id', '=', subscription_id)
+                for prof in query.fetch():
+                    prof['sub_status'] = 'free'
+                    prof['sub_source'] = ''
+                    ds_client.put(prof)
+
+            except Exception as e:
+                logging.error(f'Failed to downgrade user for subscription {subscription_id}: {e}')
+            return ('', 200)
+        return ('', 200)
+    
+    return ('', 200)
 
 
 def get_user_id():
@@ -64,13 +231,35 @@ def get_user_id():
     
 
 @app.route('/api/v1/my_stories', methods=['GET'])
-def my_stories_api():
-    print('Choosey STORIES API TRIGGERED >>>>')
+def my_stories():
     user, error = get_user_id()
     if error:
         return error
     user_stories = get_all_stories_for_user(user)
     return jsonify(user_stories)
+
+
+@app.route('/api/v1/anon_stories', methods=['GET'])
+def anon_stories():
+    anon_id = request.args.get('anon_id')
+    print(f'ANON STORIES TRIGGERED >>> {anon_id}')
+    user_stories = get_all_stories_for_anon_user(anon_id)
+    return jsonify(user_stories)
+
+
+def get_all_stories_for_anon_user(anon_id):
+    if not anon_id:
+        return []
+    query = ds_client.query(kind='Story')
+    query.add_filter('anon_id', '=', anon_id)
+    all_stories = list(query.fetch())
+    sorted_stories = sorted(all_stories, key=lambda x: x.get('last_modified'), reverse=True)
+    result = []
+    for entity in sorted_stories:
+        story = dict(entity)
+        story['id'] = entity.key.id
+        result.append(story)
+    return result
 
 
 @app.route('/set_timezone', methods=['POST'])
@@ -80,7 +269,6 @@ def set_timezone():
 
     if timezone:
         session['timezone'] = timezone
-        print('TIMEZONE SET:', session['timezone'])
         return ('', 204)
     else:
         print("Invalid timezone data")
@@ -88,8 +276,7 @@ def set_timezone():
 
 
 @app.route('/api/v1/read_story/<int:story_id>', methods=['GET'])
-def read_story_api(story_id):
-    print('read story_id >>>:', story_id, type(story_id))
+def read_story(story_id):
     user, error = get_user_id()
     if error:
         return error
@@ -106,7 +293,7 @@ def read_story_api(story_id):
 
 
 @app.route('/api/v1/get_user_profile', methods=['GET'])
-def get_user_profile_api():
+def get_user_profile():
     user, error = get_user_id()
     if error:
         return error
@@ -148,12 +335,14 @@ def update_account():
     data = request.get_json() or {}
     profile['name'] = data.get('name', '').strip()
     profile['birthdate'] = data.get('birthdate', '').strip()
+    profile['email'] = data.get('email', '')
     ds_client.put(profile)
     return jsonify({
         "success": True,
         "profile": {
             "name": profile.get('name', ''),
-            "birthdate": profile.get('birthdate', '')
+            "birthdate": profile.get('birthdate', ''),
+            "email": profile.get('email', '')
         }
     }), 200
 
@@ -165,7 +354,11 @@ def get_user_profile(user):
             profile_entity = ds_client.get(key) or {}
             user_profile = {
                 'name': profile_entity.get('name', ''),
-                'birthdate': profile_entity.get('birthdate', '')
+                'birthdate': profile_entity.get('birthdate', ''),
+                'sub_status': profile_entity.get('sub_status', 'free'),
+                'sub_source': profile_entity.get('sub_source', ''),
+                'sub_id': profile_entity.get('sub_id', ''),
+                'sub_expiry': profile_entity.get('sub_expiry', '')
             }
             return user_profile
         except Exception as e:
@@ -174,7 +367,7 @@ def get_user_profile(user):
 
 
 @app.route('/api/v1/create_story', methods=['POST'])
-def create_story_api():
+def create_story():
     user, error = get_user_id()
     data = request.get_json()
     if not data:
@@ -298,7 +491,7 @@ def save_story_db(story_set, user):
 
 
 @app.route('/api/v1/choose_path', methods=['POST'])
-def choose_path_api():
+def choose_path():
     print('CHOOSE PATH API TRIGGERED')
     data = request.get_json()
     if not data:
@@ -354,7 +547,7 @@ def update_story_db(story_id, story_set):
 
 
 @app.route('/api/v1/start_over', methods=['POST'])
-def start_over_api():
+def start_over():
     print('Start over from beginning triggered')
     data = request.get_json()
     if not data:
@@ -392,7 +585,7 @@ def start_over(story_id, user, anon_id):
 
 
 @app.route('/api/v1/go_back', methods=['POST'])
-def go_back_api():
+def go_back():
     print('Go back one story block triggered')
     data = request.get_json()
     if not data:
@@ -437,19 +630,45 @@ def delete_all_stories():
     return ''
 
 
-@app.route('/api/v1/delete_story/<int:story_id>', methods=['DELETE'])
-def delete_story_api(story_id):
-    user, error = get_user_id()
-    if error:
-        return error
-    
-    success = delete_story(story_id, user)
+@app.route('/api/v1/delete_anon_story/<int:story_id>', methods=['DELETE'])
+def delete_anon_story(story_id):
+    anon_id = request.args.get('anon_id')
+    success = delete_anonymous_story(story_id, anon_id)
     if success:
         return '', 204
     return '', 404
 
 
-def delete_story(story_id, user):
+def delete_anonymous_story(story_id, anon_id):
+    if story_id and anon_id:
+        key = ds_client.key('Story', story_id)
+        try:
+            entity = ds_client.get(key)
+        except Exception as e:
+            logging.error(f"Datastore get failed: {e}")
+            return False
+        
+        if entity and entity.get('anon_id') == anon_id:
+            # Delete the Datastore entity
+            ds_client.delete(key)
+            print(f'Story ID: {story_id} deleted')
+            return True
+        return False
+
+
+@app.route('/api/v1/delete_story/<int:story_id>', methods=['DELETE'])
+def delete_story(story_id):
+    user, error = get_user_id()
+    if error:
+        return error
+    
+    success = delete_user_story(story_id, user)
+    if success:
+        return '', 204
+    return '', 404
+
+
+def delete_user_story(story_id, user):
     if story_id and user:
         key = ds_client.key('Story', story_id)
         try:

@@ -11,6 +11,8 @@ import AccountPage from './components/AccountPage';
 import MyStories from './components/MyStories';
 import CreateStory from './components/CreateStory';
 import ReaderPage from './components/ReaderPage';
+import SuccessPage from './components/SuccessPage';
+import CancelPage from './components/CancelPage';
 
 import axios from 'axios';
 import { auth } from './firebase';
@@ -25,6 +27,8 @@ function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
   const [showLogin, setShowLogin] = useState(false);
+  const [startWithCreateAccount, setStartWithCreateAccount] = useState(false);
+  const [loginPrefill, setLoginPrefill] = useState(null);
   const [darkMode, setDarkMode] = useState(() => {
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme === null) {
@@ -40,15 +44,6 @@ function App() {
       if (user) {
         setCurrentUser(user);
         const idToken = await user.getIdToken();
-        const anonId = localStorage.getItem('anon_id');
-        if (anonId) {
-          await axios.post(`${apiBaseURL}/api/v1/migrate_anon`, { anon_id: anonId }, {
-            headers: { Authorization: `Bearer ${idToken}` }
-          });
-          localStorage.removeItem('anon_id');
-        }
-
-        console.log('ID Token:', idToken);
         axios.get(`${apiBaseURL}/api/v1/my_stories`, {
           headers: {
             Authorization: `Bearer ${idToken}`,
@@ -92,30 +87,49 @@ function App() {
     }
   }, [darkMode]);
 
-
+  // Check for signup_retry param and pendingSignup in localStorage
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('signup_retry') === 'true') {
+      // Try to load pending signup data
+      try {
+        const saved = localStorage.getItem('pendingSignup');
+        if (saved) {
+          setLoginPrefill(JSON.parse(saved));
+        }
+      } catch (e) {
+        setLoginPrefill(null);
+      }
+      setStartWithCreateAccount(true);
+      setShowLogin(true);
+    }
+  }, []);
 
 
   return (
     <Router>
       <Header />
-      <Menu currentUser={currentUser} userProfile={userProfile} darkMode={darkMode} setDarkMode={setDarkMode} onLoginClick={() => setShowLogin(true)} />
+      <Menu currentUser={currentUser} userProfile={userProfile} darkMode={darkMode} setDarkMode={setDarkMode} onLoginClick={(createAccount=false) => { setStartWithCreateAccount(createAccount); setShowLogin(true); }} />
 
       <Routes>
         <Route path="/" element={<Navigate to="/create_story" replace />} />
 
-        <Route path="/create_story" element={<CreateStory currentUser={currentUser} userProfile={userProfile} apiBaseURL={apiBaseURL} onLoginClick={() => setShowLogin(true)} />} />
+        <Route path="/create_story" element={<CreateStory currentUser={currentUser} userProfile={userProfile} apiBaseURL={apiBaseURL} onLoginClick={(createAccount=false) => { setStartWithCreateAccount(createAccount); setShowLogin(true); }} />} />
         
-        <Route path="/my_stories" element={<MyStories stories={stories} currentUser={currentUser} setStories={setStories} apiBaseURL={apiBaseURL} />} />
+        <Route path="/my_stories" element={<MyStories stories={stories} currentUser={currentUser} userProfile={userProfile} setStories={setStories} apiBaseURL={apiBaseURL} onLoginClick={(createAccount=false) => { setStartWithCreateAccount(createAccount); setShowLogin(true); }}/>} />
 
-        <Route path="/account_page" element={<AccountPage currentUser={currentUser} userProfile={userProfile} setUserProfile={setUserProfile} darkMode={darkMode} setDarkMode={setDarkMode} apiBaseURL={apiBaseURL} />}/>
+        <Route path="/account_page" element={<AccountPage currentUser={currentUser} userProfile={userProfile} setUserProfile={setUserProfile} apiBaseURL={apiBaseURL} />}/>
         
-        <Route path="/read_story/:id" element={<ReaderPage currentUser={currentUser}  darkMode={darkMode} setDarkMode={setDarkMode} apiBaseURL={apiBaseURL} onLoginClick={() => setShowLogin(true)} />} />
-
+        <Route path="/read_story/:id" element={<ReaderPage currentUser={currentUser} userProfile={userProfile} darkMode={darkMode} setDarkMode={setDarkMode} apiBaseURL={apiBaseURL} onLoginClick={(createAccount=false) => { setStartWithCreateAccount(createAccount); setShowLogin(true); }} />} />
+        
+        <Route path="/success" element={<SuccessPage />} />
+        <Route path="/cancel" element={<CancelPage />} />
+        
       </Routes>
       {showLogin && (
         <div className="modal-overlay">
           <div className="modal-content">
-            <LoginPage onClose={() => setShowLogin(false)} />
+            <LoginPage startWithCreateAccount={startWithCreateAccount} onClose={() => setShowLogin(false)} prefill={loginPrefill} />
           </div>
         </div>
       )}

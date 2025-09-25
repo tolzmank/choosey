@@ -2,9 +2,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import RetryPaymentButton from './RetryPaymentButton';
 
 
-function ReaderPage({currentUser, apiBaseURL, darkMode, setDarkMode, onLoginClick}) {
+function ReaderPage({currentUser, userProfile, apiBaseURL, darkMode, setDarkMode, onLoginClick}) {
     const location = useLocation();
     const [showRestartConfirm, setShowRestartConfirm] = useState(false);
     const { storySet } = location.state || {};
@@ -58,9 +59,9 @@ function ReaderPage({currentUser, apiBaseURL, darkMode, setDarkMode, onLoginClic
     const [localStory, setLocalStory] = useState(storySet);
     const [loading, setLoading] = useState(!storySet);
 
-    const anonId = localStory.anon_id || localStorage.getItem('anon_id');
+    const anonId = localStory?.anon_id || localStorage.getItem('anon_id');
 
-    const lastBlock = localStory?.story?.[localStory.story.length - 1];
+    const lastBlock = localStory?.story?.[localStory?.story.length - 1];
     const isAtEnd = lastBlock?.choices?.[0].decision === "";
 
     const getAuthHeaders = async () => {
@@ -72,7 +73,7 @@ function ReaderPage({currentUser, apiBaseURL, darkMode, setDarkMode, onLoginClic
         } else {
             const anonId = localStorage.getItem("anon_id");
             if (anonId) {
-            headers["anon_id"] = anonId;
+                headers["anon_id"] = anonId;
             }
         }
 
@@ -140,7 +141,11 @@ function ReaderPage({currentUser, apiBaseURL, darkMode, setDarkMode, onLoginClic
         };
 
     const handleReset = () => {
-        navigate("/my_stories");
+        if (currentUser && userProfile?.sub_status === 'unlimited') {
+            navigate("/my_stories");
+        } else {
+            navigate("/create_story");
+        }
     };
 
     const handleChoice = async (choice) => {
@@ -281,7 +286,15 @@ function ReaderPage({currentUser, apiBaseURL, darkMode, setDarkMode, onLoginClic
             ))}
             {!currentUser && (
                 <div style={{ textAlign: 'center', marginTop: '20px' }}>
-                <button className="button-gray" style={{ backgroundColor: 'transparent', color: '#7f7f7f', paddingLeft: '20px', marginBottom: '10px' }} onClick={onLoginClick} title="Login or create an account to save your stories">Login or create an account to save your stories</button>
+                <button className="button-gray" style={{ backgroundColor: 'transparent', color: '#7f7f7f', paddingLeft: '20px', marginBottom: '10px' }} onClick={onLoginClick} title="Login or create an account to save your stories">
+                    Login or create an account to save, listen, and enable custom options for your stories
+                </button>
+                </div>
+            )}
+            {currentUser && userProfile?.sub_status !== 'unlimited' &&(
+                <div style={{ textAlign: 'center', marginTop: '20px' }}>
+                    <p>Complete subscription payment to save, listen, and enable custom options for your stories</p>
+                    <RetryPaymentButton apiBaseURL={apiBaseURL} />
                 </div>
             )}
         </div>
@@ -324,6 +337,32 @@ function ReaderPage({currentUser, apiBaseURL, darkMode, setDarkMode, onLoginClic
                 </div>
                 </div>
             </div>
+            )}
+            {!currentUser && (
+                <div className="premium-banner">
+                    <p>Save all your stories & continue anytime</p>
+                    <p>Unlock all story selections</p>
+                    <p>Listen to your full stories with audiobook narration</p>
+                    <button 
+                    className="button" 
+                    onClick={() => onLoginClick(true)}
+                    >
+                    Go Unlimited
+                    </button>
+                </div>
+            )}
+            {currentUser && userProfile?.sub_status !== 'unlimited' && (
+                <div className='premium-banner'>
+                    <>
+                    <p style={{marginTop: '0px'}}>Please complete payment to unlock Choosey Unlimited features.</p>
+                    <ul>
+                        <li>Save and pick up any of your stories anytime</li>
+                        <li>Spice it up with your own custom story twists</li>
+                        <li>Hear every word with immersive audiobook narration</li>
+                    </ul>
+                    <RetryPaymentButton apiBaseURL={apiBaseURL} />
+                    </>
+                </div>
             )}
         </>
     );

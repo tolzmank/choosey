@@ -3,11 +3,27 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { auth } from '../firebase';
 import { signOut } from 'firebase/auth';
+import RetryPaymentButton from './RetryPaymentButton';
 
-function AccountPage({currentUser, userProfile, setUserProfile, darkMode, setDarkMode, apiBaseURL}) {
+function AccountPage({currentUser, userProfile, setUserProfile, apiBaseURL}) {
     const [name, setName] = useState('');
     const [birthdate, setBirthdate] = useState('');
     const [accountMessage, setAccountMessage] = useState('');
+
+    const handleManageBilling = async () => {
+        try {
+            const idToken = await currentUser.getIdToken();
+            const res = await axios.post(
+            `${apiBaseURL}/api/v1/create_customer_portal_session`,
+            { customer_id: userProfile.stripe_customer_id },
+            { headers: { Authorization: `Bearer ${idToken}` } }
+            );
+            window.location.href = res.data.url;
+        } catch (err) {
+            console.error("Error creating portal session", err);
+            alert("Could not open billing portal.");
+        }
+        };
 
     useEffect(() => {
         if (userProfile) {
@@ -71,9 +87,9 @@ function AccountPage({currentUser, userProfile, setUserProfile, darkMode, setDar
     const handleLogout = async () => {
         try {
         await signOut(auth);
-        window.location.href = '/';
+            window.location.href = '/';
         } catch (err) {
-        console.error(err);
+            console.error(err);
         alert('Logout failed.');
         }
     };
@@ -84,6 +100,21 @@ function AccountPage({currentUser, userProfile, setUserProfile, darkMode, setDar
 
     return (
         <div className="menu-container" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '20px 0' }}>
+
+            { userProfile?.sub_status !== 'unlimited' && (
+                <div className='premium-banner'>
+                    <>
+                    <p style={{marginTop: '0px'}}>Please complete payment to unlock Choosey Unlimited features.</p>
+                    <ul>
+                        <li>Save and continue all your stories anytime</li>
+                        <li>Enter your own custom story options</li>
+                        <li>Immersive full audiobook narration</li>
+                    </ul>
+                    <RetryPaymentButton apiBaseURL={apiBaseURL} />
+                    </>
+                </div>
+            )}
+
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                 <label htmlFor="name">Name</label>
                 <input className="bubble-input" style={{ marginTop: '5px', marginBottom: '20px' }} type="text" id="name" placeholder="Name" name="name" value={name} onChange={(e) => setName(e.target.value)} />
@@ -95,10 +126,17 @@ function AccountPage({currentUser, userProfile, setUserProfile, darkMode, setDar
                 <input className="bubble-input" style={{ marginTop: '5px', marginBottom: '20px' }} type="text" id="user_email" name="user_email" value={currentUser.email} readOnly />
 
                 <button type="submit" className="button" style={{ marginTop: '10px' }}>
-                Update Account Info
+                    Update Account Info
                 </button>
                 {accountMessage && <p style={{ color: 'gray' }}>{accountMessage}</p>}
             </form>
+
+
+            { userProfile?.sub_status === 'unlimited' && (
+                <button className="button-gray" style={{ marginTop: '10px' }} onClick={handleManageBilling}>
+                    Manage Payment Info
+                </button>
+            )}
 
             <button className="button-gray" style={{ marginTop: '10px' }} onClick={handleLogout} title="Logout">
                 Logout
@@ -107,6 +145,7 @@ function AccountPage({currentUser, userProfile, setUserProfile, darkMode, setDar
             <button type="button" className="button-gray" style={{ marginTop: '30px' }} onClick={handleDeleteAccount}>
                 Delete Account
             </button>
+
         </div>
 )}
 

@@ -179,8 +179,16 @@ function CreateStory({currentUser, userProfile, apiBaseURL, onLoginClick}) {
             </form>
 
             {!currentUser && (
-                <div style={{ textAlign: 'center', marginTop: '20px' }}>
-                <button className="button-gray" style={{ backgroundColor: 'transparent', color: '#7f7f7f', paddingLeft: '20px', marginBottom: '10px' }} onClick={onLoginClick} title="Login or create an account to save your stories">Login or create an account to save your stories</button>
+                <div className="premium-banner">
+                    <p>Save all your stories & continue anytime</p>
+                    <p>Unlock all story selections</p>
+                    <p>Listen to your full stories with audiobook narration</p>
+                    <button 
+                    className="button" 
+                    onClick={() => onLoginClick(true)}
+                    >
+                    Go Unlimited
+                    </button>
                 </div>
             )}
 
