@@ -208,9 +208,9 @@ select {
 }
 
 .button-gray {
-  background-color: #1d1d1d;
+  background-color: #272727;
   border: none;
-  color: #595858;
+  color: #919191;
   padding: 10px 20px;
   font-size: 16px;
   border-radius: 15px;
@@ -219,8 +219,8 @@ select {
   transition: background-color 0.15s ease, color 0.15s ease;
 }
 .button-gray:hover {
-  background-color: #2a2a2a;
-  color: #919191;
+  background-color: #343434;
+  color: #b4b4b4;
 }
 
 .button-gray-trans {
@@ -444,9 +444,14 @@ body.light-theme .menu-container,
 body.light-theme .signup-container,
 body.light-theme .container,
 body.light-theme .reader-container,
+body.light-theme .modal-content,
 body.light-theme table {
   background-color: #ebebeb;
   color: #212121;
+}
+
+body.light-theme .modal-overlay {
+  background: rgba(255, 255, 255, 0.8);
 }
 
 body.light-theme #user_email {
@@ -587,11 +592,12 @@ label {
 }
 
 .modal-content {
-  background: var(--background);
+  background-color: #2f2f2f;
   padding: 20px;
-  border-radius: 8px;
+  border-radius: 20px;
   max-width: 400px;
-  width: 90%;
+  width: 85%;
+  box-shadow: 4px 4px 8px rgba(0, 0, 0, 0.2);
 }
 
 body.light-theme .premium-banner {

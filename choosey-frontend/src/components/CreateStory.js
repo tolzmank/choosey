@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import AgeCheckModal from './AgeCheckModal';
 
 
 function CreateStory({currentUser, userProfile, apiBaseURL, onLoginClick}) {
+    const [showAgeModal, setShowAgeModal] = useState(false);
+    const [pendingSpice, setPendingSpice] = useState(null);
+
     const [genre, setGenre] = useState('');
     const [relationshipType, setRelationshipType] = useState('');
     const [length, setLength] = useState('');
@@ -13,6 +17,47 @@ function CreateStory({currentUser, userProfile, apiBaseURL, onLoginClick}) {
     const [romanticInterestPersonality, setRomanticInterestPersonality] = useState('');
 
     const [loading, setLoading] = useState(false);
+
+    const handleSelectSpice = (choice) => {
+        if (choice !== 'hot') {
+            setSpice(choice);
+            return;
+        }
+        if (!currentUser) {
+            setPendingSpice('hot');
+            setShowAgeModal(true);
+        }
+        if (userProfile?.birthdate) {
+            const birth = new Date(userProfile.birthdate);
+            const today = new Date();
+            let age = today.getFullYear() - birth.getFullYear();
+            const m = today.getMonth() - birth.getMonth();
+            if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+
+            if (age >= 18) {
+                setSpice(choice);
+            } else {
+                alert("You must be 18+ to select explicit stories.");
+            }
+            } else {
+            // logged in but no birthdate
+            setPendingSpice(choice);
+            setShowAgeModal(true);
+        }
+    };
+
+    const confirmAge = () => {
+        if (pendingSpice) {
+            setSpice(pendingSpice);
+        }
+        setShowAgeModal(false);
+        setPendingSpice(null);
+    };
+
+    const cancelAbge = () => {
+        setShowAgeModal(false);
+        setPendingSpice(null);
+    }
 
     const navigate = useNavigate();
 
@@ -81,7 +126,7 @@ function CreateStory({currentUser, userProfile, apiBaseURL, onLoginClick}) {
                 <tr>
                     <td>
                     <select className="bubble-input" name="genre" value={genre} title="Your fantasy, your rules. Select the kind of story you’re dying to dive into." onChange={e => setGenre(e.target.value)} required>
-                        <option value="" disabled selected required>Select</option>
+                        <option value="" disabled defaultValue required>Select</option>
                         <option value="romantasy">Romantasy (Romantic Fantasy)</option>
                         <option value="erotic_romance">Erotic Romance</option>
                         <option value="forbidden_romance">Forbidden Romance</option>
@@ -95,7 +140,7 @@ function CreateStory({currentUser, userProfile, apiBaseURL, onLoginClick}) {
                 <tr>
                     <td>
                     <select className="bubble-input" name="relationship_type" value={relationshipType} title="Pick the kind of relationship chaos—or clarity—you’re craving." onChange={e => setRelationshipType(e.target.value)} required>
-                        <option value="" disabled>Select</option>
+                        <option value="" disabled defaultValue required>Select</option>
                         <option value="traditional">Traditional</option>
                         <option value="reverse_harem">Reverse Harem</option>
                         <option value="mmf">Throuple (MMF)</option>
@@ -110,7 +155,7 @@ function CreateStory({currentUser, userProfile, apiBaseURL, onLoginClick}) {
                 <tr>
                     <td>
                     <select className="bubble-input" name="length" value={length} title="Pick your pace — just a quicky or keep it going and going?" onChange={e => setLength(e.target.value)} required>
-                        <option value="" disabled>Select</option>
+                        <option value="" disabled defaultValue required>Select</option>
                         <option value="quicky">Quicky (Short & Sweet)</option>
                         <option value="novella">Slow Burn (Novella)</option>
                         <option value="novel">Deep Dive (Novel)</option>
@@ -123,7 +168,7 @@ function CreateStory({currentUser, userProfile, apiBaseURL, onLoginClick}) {
                 <tr>
                     <td>
                     <select className="bubble-input" name="control" value={control} title="How hands-on do you want to be with the story? Mostly sit back or taking full control?" onChange={e => setControl(e.target.value)} required>
-                        <option value="" disabled>Select</option>
+                        <option value="" disabled defaultValue required>Select</option>
                         <option value="low">Let It Ride</option>
                         <option value="medium">A Little Control</option>
                         <option value="high">Driver's Seat</option>
@@ -134,8 +179,8 @@ function CreateStory({currentUser, userProfile, apiBaseURL, onLoginClick}) {
                 <tr><td style={{ paddingTop: '20px' }}>How Spicy are you feeling?</td></tr>
                 <tr>
                     <td>
-                    <select className="bubble-input" name="spice" value={spice} title="Mild tease or full sizzle? Set the explicitness level for your story." onChange={e => setSpice(e.target.value)} required>
-                        <option value="" disabled selected required>Select</option>
+                        <select className="bubble-input" name="spice" value={spice} title="Mild tease or full sizzle? Set the explicitness level for your story." onChange={e => handleSelectSpice(e.target.value)} required>
+                        <option value="" disabled defaultValue required>Select</option>
                         <option value="mild">Sweetie (Mild)</option>
                         <option value="medium">Just Enough Heat (Medium)</option>
                         <option value="hot">Turn Up the Heat (Explicit)</option>
@@ -147,7 +192,7 @@ function CreateStory({currentUser, userProfile, apiBaseURL, onLoginClick}) {
                 <tr>
                     <td>
                     <select className="bubble-input" name="persona" value={persona} title="Pick your story persona." onChange={e => setPersona(e.target.value)} required>
-                        <option value="" disabled selected required>Select</option>
+                        <option value="" disabled defaultValue required>Select</option>
                         <option value="sweetheart">Sweetheart (Loving & Loyal)</option>
                         <option value="badass">Badass (Bold & Fierce)</option>
                         <option value="flirt">Flirt (Charming & Teasing)</option>
@@ -161,7 +206,7 @@ function CreateStory({currentUser, userProfile, apiBaseURL, onLoginClick}) {
                 <tr>
                     <td>
                     <select className="bubble-input" name="romantic_interest_personality" value={romanticInterestPersonality} title="Choose your ideal love interest vibe." onChange={e => setRomanticInterestPersonality(e.target.value)} required>
-                        <option value="" disabled selected required>Select</option>
+                        <option value="" disabled defaultValue required>Select</option>
                         <option value="protector">Protector</option>
                         <option value="rogue">Rogue</option>
                         <option value="softie">Softie</option>
@@ -190,6 +235,13 @@ function CreateStory({currentUser, userProfile, apiBaseURL, onLoginClick}) {
                     Go Unlimited
                     </button>
                 </div>
+            )}
+            {showAgeModal && (
+            <AgeCheckModal
+                onConfirm={confirmAge}
+                onCancel={cancelAbge}
+                showProfileMessage={!!currentUser && !userProfile?.birthdate}
+            />
             )}
 
         </div>

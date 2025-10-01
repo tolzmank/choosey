@@ -16,18 +16,14 @@ import stripe
 
 # Google Cloud Datastore
 from google.cloud import datastore, secretmanager
-ds_client = datastore.Client(project="choosey-463422")
-
-# Google Cloud Bucket
-# Create the storage client with the correct project and credentials
+ds_client = datastore.Client(project="choosey-473722")
 
 # Firebase Authentication
 import firebase_admin
 from firebase_admin import auth as firebase_auth, credentials
 
 client = secretmanager.SecretManagerServiceClient()
-secret_name = os.environ["FIREBASE_ADMIN_CREDENTIALS"]
-response = client.access_secret_version(request={"name": secret_name})
+response = client.access_secret_version(request={"name": os.environ["FIREBASE_ADMIN_CREDENTIALS"]})
 secret_payload = response.payload.data.decode("UTF-8")
 cred_dict = json.loads(secret_payload)
 cred = credentials.Certificate(cred_dict)
@@ -43,23 +39,84 @@ STRIPE_PRICE_ID = stripe_response.payload.data.decode("UTF-8")
 stripe_response = client.access_secret_version(request={"name": os.environ["STRIPE_WEBHOOK"]})
 STRIPE_WEBHOOK = stripe_response.payload.data.decode("UTF-8")
 
-
 # OpenAI
 from openai import OpenAI
-openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+response = client.access_secret_version(request={"name": os.environ["OPENAI_API_KEY_CHOOSEY"]})
+openai_client = OpenAI(api_key=response.payload.data.decode("UTF-8"))
 
-from flask import Flask, render_template, redirect, url_for, request, jsonify, session, flash
+from flask import Flask, Blueprint, render_template, redirect, url_for, request, Response, jsonify, session, flash
 app = Flask(__name__)
-app.secret_key = os.getenv("FLASK_SECRET_KEY")
+response = client.access_secret_version(request={"name": os.environ["FLASK_SECRET_KEY"]})
+app.secret_key = response.payload.data.decode("UTF-8")
 from flask_cors import CORS
 CORS(app)
+
+# ElevenLabs Voice Narration
+narration_bp = Blueprint("narration", __name__)
+from elevenlabs import stream
+from elevenlabs.client import ElevenLabs
+elevenlabs = ElevenLabs()
+secret_response = client.access_secret_version(request={"name": os.environ["ELEVEN_LABS_API_KEY"]})
+ELEVEN_API_KEY = secret_response.payload.data.decode("UTF-8")
+ELEVEN_BASE_URL = "https://api.elevenlabs.io/v1"
+
 
 @app.route('/')
 def index():
     return jsonify({'status': 'Choosey API is running'})
 
 
-def set_user_unlimited(user_id, source="stripe", subscription_id=None, expiry_dt=None, promo_code=None):
+@app.route('/api/v1/narrate', methods=['POST', 'GET'])
+def narrate():
+    print(f'NARRATE TRIGGERED {ELEVEN_API_KEY}>>>')
+    if request.method == 'POST':
+        data = request.get_json() or {}
+        story_text = data.get('text')
+        voice_id = data.get('voice_id', "JBFqnCBsd6RMkjVDRZzb")
+    else:
+        story_text = request.args.get('text')
+        voice_id = request.args.get('voice_id', "JBFqnCBsd6RMkjVDRZzb")
+
+    if not story_text:
+        return jsonify({'error': 'No text provided'}), 400
+    
+    def generate():
+        try:
+            with requests.post(
+                f'{ELEVEN_BASE_URL}/text-to-speech/{voice_id}/stream',
+                headers={
+                    'xi-api-key': ELEVEN_API_KEY,
+                    'Accept': 'audio/mpeg',
+                    'Content-Type': 'application/json',
+                },
+                json={
+                    'text': story_text,
+                    'model_id': 'eleven_flash_v2',
+                    'voice_settings': {
+                        'stability': 0.0,           # Low stability (closer to 0.0): The voice will sound more expressive, dynamic, and varied — but might sometimes drift in tone, pacing, or even clarity.
+                                                    # High stability (closer to 1.0): The voice stays very consistent and “robotically” stable — less emotional nuance, but reliable and predictable.
+                        'similarity_boost': 0.1     # Low similarity boost (closer to 0.0): More natural and adaptive — the model may add variation or slight drift away from the reference voice.
+                                                    # High similarity boost (closer to 1.0): The output strongly tries to mimic the base voice exactly, but sometimes at the cost of expressiveness.
+                    }
+                },
+                stream=True
+            ) as r:
+                r.raise_for_status()
+                for chunk in r.iter_content(chunk_size=4096):
+                    if chunk:
+                        yield chunk
+        except Exception as e:
+            logging.error(f'ElevenLabs narrate failed: {e}')
+            return
+
+    try:
+        return Response(generate(), mimetype='audio/mpeg')
+    except Exception as e:
+        logging.error(f'ElevenLabs narrate failed: {e}')
+        return jsonify({'error': str(e)}), 500
+
+
+def set_user_unlimited(user_id, source="stripe", customer_id=None, subscription_id=None, expiry_dt=None, promo_code=None):
     key = ds_client.key('UserProfile', user_id)
     profile = ds_client.get(key) or datastore.Entity(key=key)
     profile['sub_status'] = 'unlimited'
@@ -67,10 +124,13 @@ def set_user_unlimited(user_id, source="stripe", subscription_id=None, expiry_dt
     if subscription_id:
         profile['sub_status'] = 'unlimited'
         profile['sub_source'] = source
+        profile['sub_id'] = subscription_id
     if expiry_dt:
         profile['sub_expiry'] = expiry_dt
     if promo_code:
         profile['promo_code'] = promo_code
+    if customer_id:
+        profile['stripe_customer_id'] = customer_id
     ds_client.put(profile)
     return profile
 
@@ -109,14 +169,21 @@ def create_checkout_session():
 
 @app.route("/api/v1/create_customer_portal_session", methods=["POST"])
 def create_customer_portal_session():
-    data = request.get_json()
-    customer_id = data.get("customer_id")
+    user, error = get_user_id()
+    if error:
+        return error
+
+    key = ds_client.key('UserProfile', user)
+    profile = ds_client.get(key)
+    customer_id = profile.get("stripe_customer_id") if profile else None
+    if not customer_id:
+        return jsonify({"error": "No Stripe customer found for user"}), 400
 
     session = stripe.billing_portal.Session.create(
         customer=customer_id,
-        return_url="https://yourdomain.com/account_page"  # where they go back after managing billing
+        return_url=os.getenv("FRONTEND_URL", "http://localhost:3000") + "/account_page"
     )
-    return jsonify({ "url": session.url })
+    return jsonify({"url": session.url})
 
 
 @app.route('/api/v1/stripe_webhook', methods=['POST'])
@@ -139,6 +206,7 @@ def stripe_webhook():
     if event_type == 'checkout.session.completed' and data_obj.get('mode') == 'subscription':
         # Use client_reference_id as the Firebase UID
         uid = data_obj.get('client_reference_id')
+        customer_id = data_obj.get('customer')
         subscription_id = data_obj.get('subscription')
         discounts = data_obj.get('discounts', [])
         expiry_dt = None
@@ -157,7 +225,13 @@ def stripe_webhook():
         except Exception as e:
             logging.error(f'Failed to retrieve subscription {subscription_id}: {e}')
         if uid:
-            set_user_unlimited(uid, source='stripe', subscription_id=subscription_id, expiry_dt=expiry_dt, promo_code=promo_code)
+            set_user_unlimited(uid, 
+                               source='stripe', 
+                               customer_id=customer_id, 
+                               subscription_id=subscription_id, 
+                               expiry_dt=expiry_dt, 
+                               promo_code=promo_code
+                               )
             return ('', 200)
         else:
             logging.warning("Stripe webhook: No client_reference_id (Firebase UID) found in checkout.session.completed event")
@@ -210,6 +284,42 @@ def stripe_webhook():
             return ('', 200)
         return ('', 200)
     
+    if event_type == 'invoice.payment_succeeded':
+        try:
+            subscription_id = data_obj.get('subscription')
+            customer_id = data_obj.get('customer')
+            if subscription_id:
+                sub = stripe.Subscription.retrieve(subscription_id)
+                expiry_dt = datetime.fromtimestamp(int(sub['current_period_end']), tz=timezone.utc)
+                query = ds_client.query(kind='UserProfile')
+                query.add_filter('sub_id', '=', subscription_id)
+                for prof in query.fetch():
+                    prof['sub_status'] = 'unlimited'
+                    prof['sub_source'] = 'stripe'
+                    prof['sub_expiry'] = expiry_dt
+                    ds_client.put(prof)
+        except Exception as e:
+            logging.error(f'Failed to process invoice.payment_succeeded: {e}')
+        return ('', 200)
+    
+    if event_type in ('invoice.payment_failed', 'customer.subscription.deleted', 'customer.subscription.updated'):
+            subscription_id = data_obj.get('subscription') or data_obj.get('id')
+            status = data_obj.get('status')
+            if status in ('canceled', 'unpaid', 'past_due'):
+                try:
+                    query = ds_client.query(kind='UserProfile')
+                    query.add_filter('sub_id', '=', subscription_id)
+                    for prof in query.fetch():
+                        prof['sub_status'] = 'free'
+                        prof['sub_source'] = ''
+                        ds_client.put(prof)
+                        print(f'Downgraded user for subscription {subscription_id}')
+                except Exception as e:
+                    logging.error(f'Failed to downgrade user for subscription {subscription_id}: {e}')
+            return ('', 200)
+
+
+
     return ('', 200)
 
 
@@ -306,6 +416,15 @@ def delete_account():
     user, error = get_user_id()
     if error:
         return error
+    # Cancel Stripe subscription if exists
+    try:
+        key = ds_client.key('UserProfile', user)
+        profile = ds_client.get(key)
+        if profile and profile.get('sub_id'):
+            stripe.Subscription.delete(profile['sub_id'])
+    except Exception as e:
+        if profile and profile.get('sub_status') == 'unlimited':
+            logging.error(f'Error canceling Stripe subscription: {e}')
     # Delete Firebase user
     try:
         firebase_auth.delete_user(user)
@@ -331,11 +450,16 @@ def update_account():
     # Fetch or create the UserProfile entity
     key = ds_client.key('UserProfile', user)
     profile = ds_client.get(key) or datastore.Entity(key=key)
-    # Update fields from form
+    # Update fields only if present in incoming data
     data = request.get_json() or {}
-    profile['name'] = data.get('name', '').strip()
-    profile['birthdate'] = data.get('birthdate', '').strip()
-    profile['email'] = data.get('email', '')
+    if 'name' in data:
+        profile['name'] = data['name'].strip() if isinstance(data['name'], str) else data['name']
+    if 'birthdate' in data:
+        profile['birthdate'] = data['birthdate'].strip() if isinstance(data['birthdate'], str) else data['birthdate']
+    if 'email' in data:
+        profile['email'] = data['email']
+    if 'voice_id' in data:
+        profile['voice_id'] = data['voice_id']
     ds_client.put(profile)
     return jsonify({
         "success": True,
@@ -355,6 +479,7 @@ def get_user_profile(user):
             user_profile = {
                 'name': profile_entity.get('name', ''),
                 'birthdate': profile_entity.get('birthdate', ''),
+                'voice_id': profile_entity.get('voice_id', 'JBFqnCBsd6RMkjVDRZzb'),
                 'sub_status': profile_entity.get('sub_status', 'free'),
                 'sub_source': profile_entity.get('sub_source', ''),
                 'sub_id': profile_entity.get('sub_id', ''),

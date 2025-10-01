@@ -2,15 +2,15 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 
-  const firebaseConfig = {
-    apiKey: "AIzaSyCqgEU3MC99RRiJcFnh6qZu7cqm2mzH-j0",
-    authDomain: "choosey-463422.firebaseapp.com",
-    projectId: "choosey-463422",
-    storageBucket: "choosey-463422.appspot.com",
-    messagingSenderId: "972281558326",
-    appId: "1:972281558326:web:4183dcadbd95da4e2c2f97",
-    measurementId: "G-X9R8NWZX3G"
-  };
+const firebaseConfig = {
+  apiKey: "AIzaSyDbLjSQL_J5s1_vPpTNGBNndhc0ptNCsaQ",
+  authDomain: "choosey-473722.firebaseapp.com",
+  projectId: "choosey-473722",
+  storageBucket: "choosey-473722.firebasestorage.app",
+  messagingSenderId: "815398912499",
+  appId: "1:815398912499:web:a2d7633d784b2e74ed1286",
+  measurementId: "G-8396Q4LJJF"
+};
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);

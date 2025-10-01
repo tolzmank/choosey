@@ -1,7 +1,8 @@
 // src/components/LoginPage.js
 import React, { useState, useEffect } from 'react';
 import { auth, googleProvider } from '../firebase';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup, sendEmailVerification, sendPasswordResetEmail } from 'firebase/auth';
+import { useNavigate } from 'react-router-dom';
 
 function LoginPage({onClose, startWithCreateAccount = false, prefill = null}) {
     const [showCreateAccount, setShowCreateAccount] = useState(startWithCreateAccount);
@@ -50,11 +51,25 @@ function LoginPage({onClose, startWithCreateAccount = false, prefill = null}) {
 
         // Clear redirect key and go back
         localStorage.removeItem("postLoginRedirect");
-        window.location.href = prevPath || "/";
+        window.location.href = prevPath || "/my_stories";
       } catch (err) {
         setError(err.message);
       }
     };
+
+    async function handleForgotPassword(email) {
+      if (!email) {
+        alert("Please enter your email address first.");
+        return;
+      }
+      try {
+        await sendPasswordResetEmail(auth, email);
+        alert("Password reset email sent. Check your inbox!");
+      } catch (err) {
+        console.error("Error sending reset email:", err);
+        alert(err.message);
+      }
+    }
 
     const handleSignUp = async () => {
       localStorage.setItem("postSignupRedirect", window.location.href);
@@ -116,7 +131,7 @@ function LoginPage({onClose, startWithCreateAccount = false, prefill = null}) {
           console.error("Anon migration failed", e);
         }
 
-        // 3. Now launch Stripe Checkout
+        // Launch Stripe Checkout
         await handleGoUnlimited();
       } catch (err) {
         setError(err.message);
@@ -124,6 +139,8 @@ function LoginPage({onClose, startWithCreateAccount = false, prefill = null}) {
     };
 
     const handleGoogleSignIn = async () => {
+      localStorage.setItem("postLoginRedirect", window.location.href);
+      localStorage.setItem("postSignupRedirect", window.location.href);
       try {
         const userCred = await signInWithPopup(auth, googleProvider);
         const idToken = await userCred.user.getIdToken();
@@ -155,10 +172,24 @@ function LoginPage({onClose, startWithCreateAccount = false, prefill = null}) {
           localStorage.removeItem("anon_id");
         }
 
-        // Redirect back to where user was or to account page
-        const prevPath = localStorage.getItem("postLoginRedirect") || "/account_page";
-        localStorage.removeItem("postLoginRedirect");
-        window.location.href = prevPath;
+        const profileRes = await fetch(`${process.env.REACT_APP_API_BASE_URL || "http://127.0.0.1:8080"}/api/v1/get_user_profile`, {
+          method: "GET",
+          headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${idToken}`
+            }
+        });
+        const profileData = await profileRes.json();
+        if (profileData.sub_status !== 'unlimited') {
+          // New user or unpaid user signed in - redirect to payment
+          await handleGoUnlimited();
+
+        } else {
+          // Existing paid user - Redirect back to where user was or to account page
+          const prevPath = localStorage.getItem("postLoginRedirect") || "/my_stories";
+          localStorage.removeItem("postLoginRedirect");
+          window.location.href = prevPath;
+        }
       } catch (err) {
         setError(err.message);
       }
@@ -208,8 +239,6 @@ function LoginPage({onClose, startWithCreateAccount = false, prefill = null}) {
 
     return (
         <div className="signup-container">
-
-
           <h2><button className="button-menu-gray" onClick={() => setShowCreateAccount(true)} style={{ marginTop: '10px', fontWeight: showCreateAccount? 'bold':'normal', color: showCreateAccount? '#999':'#FF4F81'}}>Create Account</button> | <button className="button-menu-gray"  style={{ marginTop: '20px', fontWeight: !showCreateAccount? 'bold':'normal', color: !showCreateAccount? '#999':'#FF4F81' }} onClick={() => setShowCreateAccount(false)}>Login</button></h2>
           
           <button className="button-menu-gray" style={{ paddingTop: '3px', paddingBottom: '15px', borderRadius: '30px', position: 'absolute', top: '10px', right: '10px'}} onClick={onClose}>
@@ -257,6 +286,7 @@ function LoginPage({onClose, startWithCreateAccount = false, prefill = null}) {
 
               <button className="button" style={{ marginTop: '30px' }} onClick={handleSignUp}>Create Account</button>
               {error && <p style={{ color: 'gray' }}>{error}</p>}
+              <button className="button-menu-gray" onClick={handleGoogleSignIn} style={{ marginTop: '10px' }}>Sign up with Google</button>
             </>
           ) : (
             <>
@@ -269,10 +299,19 @@ function LoginPage({onClose, startWithCreateAccount = false, prefill = null}) {
               <button className="button" onClick={handleSignIn} style={{ marginTop: '20px' }}>Login</button>
               {error && <p style={{ color: 'gray' }}>{error}</p>}
               <button className="button-menu-gray" onClick={handleGoogleSignIn} style={{ marginTop: '10px' }}>Sign in with Google</button>
+
+
+              <button 
+                className="button-menu-gray" 
+                style={{ color: '#919191' }}
+                onClick={() => handleForgotPassword(email)}>
+                Forgot your password?
+              </button>
+
             </>
           )}
 
-          <button className="button-menu-gray" style={{ marginTop: '20px' }} onClick={onClose}>Cancel</button>
+          <button className="button-gray" style={{ marginTop: '20px' }} onClick={onClose}>Cancel</button>
 
           
       </div>

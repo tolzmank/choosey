@@ -4,18 +4,25 @@ import axios from 'axios';
 import { auth } from '../firebase';
 import { signOut } from 'firebase/auth';
 import RetryPaymentButton from './RetryPaymentButton';
+import ChangeEmailForm from './ChangeEmailForm';
+import ChangePasswordForm from './ChangePasswordForm';
+
 
 function AccountPage({currentUser, userProfile, setUserProfile, apiBaseURL}) {
     const [name, setName] = useState('');
     const [birthdate, setBirthdate] = useState('');
     const [accountMessage, setAccountMessage] = useState('');
 
+    const [showDeleteAccountConfirm, setShowDeleteAccountConfirm] = useState(false);
+    const [showLoginInfoModal, setShowLoginInfoModal] = useState(false);
+    const [mode, setMode] = useState('email');
+
     const handleManageBilling = async () => {
         try {
             const idToken = await currentUser.getIdToken();
             const res = await axios.post(
             `${apiBaseURL}/api/v1/create_customer_portal_session`,
-            { customer_id: userProfile.stripe_customer_id },
+            {},
             { headers: { Authorization: `Bearer ${idToken}` } }
             );
             window.location.href = res.data.url;
@@ -44,7 +51,7 @@ function AccountPage({currentUser, userProfile, setUserProfile, apiBaseURL}) {
             const idToken = await currentUser.getIdToken();
             await axios.put(
                 `${apiBaseURL}/api/v1/update_account`,
-                { name, birthdate },
+                { name, birthdate, voice_id: userProfile.voice_id },
                 { headers: { Authorization: `Bearer ${idToken}` } }
             );
 
@@ -65,9 +72,6 @@ function AccountPage({currentUser, userProfile, setUserProfile, apiBaseURL}) {
     };
 
     const handleDeleteAccount = async () => {
-        if (!window.confirm('Are you sure you want to delete your Account? This cannot be undone.')) {
-            return;
-        }
         try {
             const idToken = await currentUser.getIdToken();
             await axios.delete(
@@ -76,7 +80,8 @@ function AccountPage({currentUser, userProfile, setUserProfile, apiBaseURL}) {
             );
             // Sign out locally
             await signOut(auth);
-            alert('Account deleted.');
+            //alert('Account deleted.');
+
             window.location.href = '/';
         } catch (err) {
             console.error(err);
@@ -86,13 +91,22 @@ function AccountPage({currentUser, userProfile, setUserProfile, apiBaseURL}) {
 
     const handleLogout = async () => {
         try {
-        await signOut(auth);
-            window.location.href = '/';
-        } catch (err) {
-            console.error(err);
-        alert('Logout failed.');
+            await signOut(auth);
+                localStorage.removeItem("postLoginRedirect");
+                localStorage.removeItem('postSignupRedirect');
+                window.location.href = '/';
+            } catch (err) {
+                console.error(err);
+            alert('Logout failed.');
         }
     };
+
+    useEffect(() => {
+        if (localStorage.getItem('openLoginInfoModal') === 'true') {
+            setShowLoginInfoModal(true);
+            localStorage.removeItem('openLoginInfoModal');
+        }
+    }, []);
 
     if (!currentUser) {
         return <p>Please log in to view your account.</p>;
@@ -109,6 +123,7 @@ function AccountPage({currentUser, userProfile, setUserProfile, apiBaseURL}) {
                         <li>Save and continue all your stories anytime</li>
                         <li>Enter your own custom story options</li>
                         <li>Immersive full audiobook narration</li>
+                        <li>Just $4.99 / month</li>
                     </ul>
                     <RetryPaymentButton apiBaseURL={apiBaseURL} />
                     </>
@@ -125,16 +140,26 @@ function AccountPage({currentUser, userProfile, setUserProfile, apiBaseURL}) {
                 <label htmlFor="user_email">Email</label>
                 <input className="bubble-input" style={{ marginTop: '5px', marginBottom: '20px' }} type="text" id="user_email" name="user_email" value={currentUser.email} readOnly />
 
+                <label htmlFor="voice">Narration Voice</label>
+                    <select id="voice" className="bubble-input" style={{ marginTop: '5px', marginBottom: '20px' }} value={userProfile?.user_voice_id || "JBFqnCBsd6RMkjVDRZzb"} onChange={(e) => setUserProfile({...userProfile, user_voice_id: e.target.value})}>
+                        <option value="JBFqnCBsd6RMkjVDRZzb">Default (Rachel)</option>
+                        <option value="EXAVITQu4vr4xnSDxMaL">Bella</option>
+                        <option value="ErXwobaYiN019PkySvjV">Josh</option>
+                        {/* add more voices here */}
+                    </select>
+
                 <button type="submit" className="button" style={{ marginTop: '10px' }}>
-                    Update Account Info
+                    Save Settings
                 </button>
                 {accountMessage && <p style={{ color: 'gray' }}>{accountMessage}</p>}
             </form>
-
+            <button className="button-gray" style={{ marginTop: '10px' }} onClick={() => setShowLoginInfoModal(true)}>
+                Change Login Info
+            </button>
 
             { userProfile?.sub_status === 'unlimited' && (
                 <button className="button-gray" style={{ marginTop: '10px' }} onClick={handleManageBilling}>
-                    Manage Payment Info
+                    Manage Subscription
                 </button>
             )}
 
@@ -142,10 +167,52 @@ function AccountPage({currentUser, userProfile, setUserProfile, apiBaseURL}) {
                 Logout
             </button>
 
-            <button type="button" className="button-gray" style={{ marginTop: '30px' }} onClick={handleDeleteAccount}>
+            <button type="button" className="button-gray" style={{ marginTop: '30px' }} onClick={() => setShowDeleteAccountConfirm(true)}>
                 Delete Account
             </button>
+    {showDeleteAccountConfirm && (
+        <div className="modal-overlay">
+            <div className="modal-content" style={{ backgroundColor: '#2f2f2f' }}>
+            <h4>Are you sure?</h4>
+            <p>
+                Deleting your account will:
+                <ul>
+                    <li>Cancel your subscription</li>
+                    <li>Permanently delete all your stories</li>
+                    <li>Remove your profile</li>
+                </ul>
+            </p>
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: "20px" }}>
+                <button className="button" onClick={() => setShowDeleteAccountConfirm(false)}>
+                Cancel
+                </button>
+                <button className="button-gray" onClick={handleDeleteAccount}>
+                Yes, Delete My Account
+                </button>
+            </div>
+            </div>
+        </div>
+        )}
 
+    {showLoginInfoModal && (
+        <div className="modal-overlay">
+            <div className="signup-container" style={{ position: "relative" }}>
+                <div style={{paddingBottom: '20px'}}>
+                    <h2><button className="button-menu-gray" onClick={() => setMode('email')} style={{ fontWeight: mode === 'email' ? 'bold':'normal', color: mode === 'email' ? '#999':'#FF4F81'}}>Change Email</button> | <button className="button-menu-gray"  style={{ fontWeight: mode === 'password'? 'bold':'normal', color: mode === 'password'? '#999':'#FF4F81' }} onClick={() => setMode('password')}>Change Password</button></h2>
+                </div>
+
+                <button className="button-menu-gray" style={{ paddingTop: '3px', paddingBottom: '15px', borderRadius: '30px', position: 'absolute', top: '10px', right: '10px'}} onClick={() => setShowLoginInfoModal(false)}>
+                    <img src="/icons/close_gray.svg" alt="Close"  className="menu-icon" style={{ height: '30px'}} />
+                </button>
+
+                {mode === 'email' ? (
+                    <ChangeEmailForm currentUser={currentUser} apiBaseURL={apiBaseURL} />
+                ) : (
+                    <ChangePasswordForm currentUser={currentUser} />
+                )}
+            </div>
+        </div>
+        )}
         </div>
 )}
 

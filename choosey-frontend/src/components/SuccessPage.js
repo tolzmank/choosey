@@ -3,7 +3,7 @@ import React, { useEffect } from 'react';
 function SuccessPage() {
   useEffect(() => {
     const handleRedirect = () => {
-      const redirectPath = localStorage.getItem('postSignupRedirect') || "/create_story";
+      const redirectPath = localStorage.getItem('postSignupRedirect') || "/my_stories";
       localStorage.removeItem('postSignupRedirect');
       window.location.href = redirectPath;
     };

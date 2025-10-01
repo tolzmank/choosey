@@ -128,9 +128,7 @@ function App() {
       </Routes>
       {showLogin && (
         <div className="modal-overlay">
-          <div className="modal-content">
-            <LoginPage startWithCreateAccount={startWithCreateAccount} onClose={() => setShowLogin(false)} prefill={loginPrefill} />
-          </div>
+          <LoginPage startWithCreateAccount={startWithCreateAccount} onClose={() => setShowLogin(false)} prefill={loginPrefill} />
         </div>
       )}
     </Router>

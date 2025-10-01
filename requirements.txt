@@ -10,3 +10,7 @@ firebase-admin
 pytz
 google-cloud-secret-manager
 python-dotenv
+
+flask-cors
+elevenlabs
+stripe>=10.0.0

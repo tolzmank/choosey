@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import RetryPaymentButton from './RetryPaymentButton';
-
+import StoryAudioButton from "../components/StoryAudioButton";
 
 function ReaderPage({currentUser, userProfile, apiBaseURL, darkMode, setDarkMode, onLoginClick}) {
     const location = useLocation();
@@ -23,6 +23,25 @@ function ReaderPage({currentUser, userProfile, apiBaseURL, darkMode, setDarkMode
     const [fontSize, setFontSize] = useState(18);
     const [lineSpacing, setLineSpacing] = useState(1.5);
     
+
+    // Audiobook Narration
+    const playNarration = async (text) => {
+        const res = await fetch(`${apiBaseURL}/api/v1/narrate`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text, voice_id: "JBFqnCBsd6RMkjVDRZzb" })
+        });
+
+        if (!res.ok) {
+            console.error("Failed to start narration");
+            return;
+        }
+
+        const audioUrl = URL.createObjectURL(await res.blob());
+        const audio = new Audio(audioUrl);
+        audio.play();
+    };
+
     // Restore persisted settings on mount
     useEffect(() => {
       const fs = localStorage.getItem('readerFontSize');
@@ -62,7 +81,6 @@ function ReaderPage({currentUser, userProfile, apiBaseURL, darkMode, setDarkMode
     const anonId = localStory?.anon_id || localStorage.getItem('anon_id');
 
     const lastBlock = localStory?.story?.[localStory?.story.length - 1];
-    const isAtEnd = lastBlock?.choices?.[0].decision === "";
 
     const getAuthHeaders = async () => {
         const headers = {};
@@ -92,7 +110,7 @@ function ReaderPage({currentUser, userProfile, apiBaseURL, darkMode, setDarkMode
                 } else {
                     const anonId = localStorage.getItem("anon_id");
                     if (anonId) {
-                    headers["anon_id"] = anonId;
+                        headers["anon_id"] = anonId;
                     }
                 }
 
@@ -249,8 +267,9 @@ function ReaderPage({currentUser, userProfile, apiBaseURL, darkMode, setDarkMode
             <p style={{ fontWeight: 700, textAlign: 'center', fontSize: 20 }}>{localStory?.title}</p>
             {localStory?.story?.map((plotBlock, index) => (
                 <div key={index}>
-                    <p style={{fontSize: `${fontSize}px`, lineHeight: lineSpacing,  margin: 10}}>{plotBlock.text}</p>
-
+                    <p style={{fontSize: `${fontSize}px`, lineHeight: lineSpacing,  margin: 10}}>
+                        <StoryAudioButton storyText={plotBlock.text} apiBaseURL={apiBaseURL}/> {plotBlock.text}</p>
+                    
                     {index === localStory.story.length - 1 && plotBlock.choices && (
                         <>
                             {plotBlock.choices?.[0]?.decision !== "" ? (

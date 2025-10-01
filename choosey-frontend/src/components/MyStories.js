@@ -149,7 +149,7 @@ function MyStories({stories, currentUser, userProfile, setStories, apiBaseURL, o
                 return(
                     <>
                     <tr>
-                        <td colspan='3'>
+                        <td colSpan='3'>
                             <h3><img src="/images/fuzzy_handcuffs.png" alt="Fuzzy Handcuffs" style={{ marginTop: '-10px', height: '40px'}} /> Your stories are all tied up and waiting...</h3>
                         </td>
                     </tr>
@@ -190,7 +190,7 @@ function MyStories({stories, currentUser, userProfile, setStories, apiBaseURL, o
                         </tr>
                     )}
                         <tr>
-                            <td colspan='3'>
+                            <td colSpan='3'>
                                 <div className='premium-banner'>
                                 <h3 style={{color: '#999', marginTop: '0px'}}><img src="/images/handcuff_key.png" alt="Handcuff Key" style={{ marginTop: '-10px', height: '20px'}} /> Unlock them now... just leave the money on the dresser <img src="/images/flirty_smiley.png" alt="Flirty Smiley" style={{ height: '20px'}} /></h3>
                                 
@@ -208,7 +208,7 @@ function MyStories({stories, currentUser, userProfile, setStories, apiBaseURL, o
                 return (
                     <>
                     <tr>
-                        <td colspan='3'>
+                        <td colSpan='3'>
                             <h3><img src="/images/fuzzy_handcuffs.png" alt="Fuzzy Handcuffs" style={{ marginTop: '-10px', height: '40px'}} /> anon Your stories are all tied up and waiting...</h3>
                         </td>
                     </tr>
@@ -249,7 +249,7 @@ function MyStories({stories, currentUser, userProfile, setStories, apiBaseURL, o
                         </tr>
                     )}
                         <tr>
-                            <td colspan='3'>
+                            <td colSpan='3'>
                                 <div className='premium-banner'>
                                     <h3 style={{color: '#999', marginTop: '0px'}}><img src="/images/handcuff_key.png" alt="Handcuff Key" style={{ marginTop: '-10px', height: '20px'}} /> Unlock them now... <img src="/images/flirty_smiley.png" alt="Flirty Smiley" style={{ height: '20px'}} /></h3>
                                     <button  className="button" onClick={() => onLoginClick(true)}>Go Unlimited</button>
@@ -263,7 +263,7 @@ function MyStories({stories, currentUser, userProfile, setStories, apiBaseURL, o
             } else {
                 return (
                     <tr>
-                        <td>No currentUser, no anon, No stories yet</td>
+                        <td>No stories yet</td>
                     </tr>
                 )
             }
@@ -289,7 +289,7 @@ function MyStories({stories, currentUser, userProfile, setStories, apiBaseURL, o
 
             {showDeleteConfirm && (
                 <div className="modal-overlay">
-                    <div className="modal-content" style={{ backgroundColor: '#2f2f2f' }}>
+                    <div className="modal-content">
                     <h4>Delete Story?</h4>
                     <p>This will permanently remove this story from your account. Are you sure?</p>
                     <div style={{ display: "flex", justifyContent: "space-between", marginTop: "20px" }}>
