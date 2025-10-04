@@ -22,25 +22,16 @@ function ReaderPage({currentUser, userProfile, apiBaseURL, darkMode, setDarkMode
     // Text appearance
     const [fontSize, setFontSize] = useState(18);
     const [lineSpacing, setLineSpacing] = useState(1.5);
-    
 
-    // Audiobook Narration
-    const playNarration = async (text) => {
-        const res = await fetch(`${apiBaseURL}/api/v1/narrate`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ text, voice_id: "JBFqnCBsd6RMkjVDRZzb" })
-        });
-
-        if (!res.ok) {
-            console.error("Failed to start narration");
-            return;
-        }
-
-        const audioUrl = URL.createObjectURL(await res.blob());
-        const audio = new Audio(audioUrl);
-        audio.play();
-    };
+    // Stop audio if leaving ReaderPage
+    useEffect(() => {
+        return () => {
+            if (window.activeAudio && !window.activeAudio.paused) {
+                window.activeAudio.pause();
+                window.activeAudio = null;
+            }
+        };
+    }, []);
 
     // Restore persisted settings on mount
     useEffect(() => {
@@ -156,7 +147,7 @@ function ReaderPage({currentUser, userProfile, apiBaseURL, darkMode, setDarkMode
         } catch (err) {
             console.error("Start Over failed", err);
         }
-        };
+    };
 
     const handleReset = () => {
         if (currentUser && userProfile?.sub_status === 'unlimited') {
@@ -268,18 +259,14 @@ function ReaderPage({currentUser, userProfile, apiBaseURL, darkMode, setDarkMode
             {localStory?.story?.map((plotBlock, index) => (
                 <div key={index}>
                     <p style={{fontSize: `${fontSize}px`, lineHeight: lineSpacing,  margin: 10}}>
-                        <StoryAudioButton storyText={plotBlock.text} apiBaseURL={apiBaseURL}/> {plotBlock.text}</p>
+                        <StoryAudioButton storyText={plotBlock.text} apiBaseURL={apiBaseURL} voiceId={userProfile?.voice_id || "5bb7de05-c8fe-426a-8fcc-ba4fc4ce9f9c"} voiceSpeed={userProfile?.voice_speed || 1.0}/> {plotBlock.text}</p>
                     
                     {index === localStory.story.length - 1 && plotBlock.choices && (
                         <>
                             {plotBlock.choices?.[0]?.decision !== "" ? (
                                 <div className="decision-row">
                                     {plotBlock.choices.map((choice, idx) => (
-                                        <button
-                                            key={idx}
-                                            className="decision-button"
-                                            onClick={() => handleChoice(choice)}
-                                        >
+                                        <button key={idx} className="decision-button" style={{fontSize: `${fontSize}px`, lineHeight: lineSpacing}} onClick={() => handleChoice(choice)}>
                                             {choice.decision}
                                         </button>
                                     ))}

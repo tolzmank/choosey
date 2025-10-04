@@ -2,42 +2,40 @@ import React, { useState, useRef } from "react";
 import playIcon from "../assets/icons/play_circle_pink.svg";
 import pauseIcon from "../assets/icons/pause_circle_pink.svg";
 
-let activeAudio = null;
+if (!window.activeAudio) {
+  window.activeAudio = null;
+}
 
-const StoryAudioButton = ({storyText, apiBaseURL}) => {
+const StoryAudioButton = ({storyText, apiBaseURL, voiceId, voiceSpeed}) => {
     const [isPlaying, setIsPlaying] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
     const audioRef = useRef(null);
 
     const handlePlayPause = async () => {
         if (isPlaying) {
             if (audioRef.current) {
                 audioRef.current.pause();
-                // Do NOT null out audioRef.current; allow resume.
             }
             setIsPlaying(false);
         } else {
-            if (activeAudio && activeAudio !== audioRef.current) {
-                activeAudio.pause();
+            setIsLoading(true);
+            if (window.activeAudio && window.activeAudio !== audioRef.current) {
+                window.activeAudio.pause();
             }
 
-            // Stream narration audio directly from backend
-            const url = `${apiBaseURL}/api/v1/narrate?text=${encodeURIComponent(storyText)}&voice_id=JBFqnCBsd6RMkjVDRZzb`;
             try {
-                const res = await fetch(url, {method: "HEAD"});
-                if (!res.ok) {
-                    alert("Narration unavailable. Please try again later.");
-                    return;
-                }
+                // Stream narration audio directly from backend
+                const audioUrl = `${apiBaseURL}/api/v1/narrate_hume?text=${encodeURIComponent(storyText)}&voice_id=${voiceId}&voice_speed=${voiceSpeed}`;
                 // Only create a new Audio instance if not already present
                 if (!audioRef.current) {
-                    audioRef.current = new Audio(url);
+                    audioRef.current = new Audio(audioUrl);
                     audioRef.current.crossOrigin = 'anonymous';
 
                     // Reset button back when playback finishes
                     audioRef.current.addEventListener('ended', () => {
                         setIsPlaying(false);
-                        if (activeAudio === audioRef.current) {
-                            activeAudio = null;
+                        if (window.activeAudio === audioRef.current) {
+                            window.activeAudio = null;
                         }
                         audioRef.current = null;
                     });
@@ -46,33 +44,44 @@ const StoryAudioButton = ({storyText, apiBaseURL}) => {
                     audioRef.current.addEventListener("error", (e) => {
                         console.error("Audio playback error:", e);
                         setIsPlaying(false);
-                        if (activeAudio === audioRef.current) {
-                            activeAudio = null;
+                        setIsLoading(false);
+                        if (window.activeAudio === audioRef.current) {
+                            window.activeAudio = null;
                         }
                         audioRef.current = null;
                         alert('Narration failed. Please try again.')
                     });
                 }
-                activeAudio = audioRef.current;
+                window.activeAudio = audioRef.current;
 
                 // Start/resume playing audio
                 await audioRef.current.play();
+                setIsLoading(false);
                 setIsPlaying(true);
             } catch (err) {
                 console.error("Narration failed:", err);
                 alert("Narration unavailable. Please try again later.");
+                setIsLoading(false);
                 setIsPlaying(false);
             }
         }
     };
 
     return (
-        <button onClick={handlePlayPause} className="button-gray" style={{paddingBottom: '0px', paddingTop: '4px'}}>
-            <img
-                src={isPlaying ? pauseIcon : playIcon}
-                style={{height: 30}}
-                alt={isPlaying ? "Pause narration" : "Play narration"}
-            />
+        <button onClick={handlePlayPause} className="button-gray" style={{paddingBottom: '4px', paddingTop: '4px'}}>
+            
+            {isLoading ? (
+                <div className="loading-spinner small"></div>
+            ) : (
+                <div className="audio-button-content">
+                <img
+                    src={isPlaying ? pauseIcon : playIcon}
+                    style={{height: 30}}
+                    alt={isPlaying ? "Pause narration" : "Play narration"}
+                />
+                </div>
+            )}
+            
         </button>
     );
 };

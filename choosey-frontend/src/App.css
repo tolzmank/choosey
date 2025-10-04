@@ -401,6 +401,24 @@ th:not(.sorttable_sorted):not(.sorttable_sorted_reverse):hover::after {
   justify-content: center;
   align-items: center;
 }
+.audio-button-content {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 30px;   /* fixed width */
+  height: 30px;  /* fixed height */
+
+}
+.loading-spinner.small {
+  border: 4px solid #a3a3a3;
+  border-top: 4px solid #FF4F81;
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  margin-top: 0px;
+  margin-bottom: 0px;
+  animation: spin 1s linear infinite;
+}
 
 .loading-spinner {
   border: 8px solid #a3a3a3;

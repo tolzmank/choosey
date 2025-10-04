@@ -1,8 +1,9 @@
 import logging
 logging.basicConfig(level=logging.INFO)
-
+import re
 import os
 import requests
+import random
 import io
 import uuid
 from datetime import datetime, timezone, timedelta
@@ -60,22 +61,105 @@ secret_response = client.access_secret_version(request={"name": os.environ["ELEV
 ELEVEN_API_KEY = secret_response.payload.data.decode("UTF-8")
 ELEVEN_BASE_URL = "https://api.elevenlabs.io/v1"
 
+# Hume AI Narration
+from hume import HumeClient
+from hume.tts import PostedUtterance, PostedUtteranceVoiceWithName, PostedUtteranceVoiceWithId
+secret_response = client.access_secret_version(request={"name": os.environ["HUME_API_KEY"]})
+HUME_API_KEY = secret_response.payload.data.decode("UTF-8")
+
 
 @app.route('/')
 def index():
     return jsonify({'status': 'Choosey API is running'})
 
 
-@app.route('/api/v1/narrate', methods=['POST', 'GET'])
-def narrate():
-    print(f'NARRATE TRIGGERED {ELEVEN_API_KEY}>>>')
-    if request.method == 'POST':
-        data = request.get_json() or {}
-        story_text = data.get('text')
-        voice_id = data.get('voice_id', "JBFqnCBsd6RMkjVDRZzb")
-    else:
+@app.route('/api/v1/narrate_hume', methods=['GET'])
+def narrate_hume():
+    print(f'NARRATE HUME TRIGGERED: {HUME_API_KEY} >>>')
+    try:
         story_text = request.args.get('text')
-        voice_id = request.args.get('voice_id', "JBFqnCBsd6RMkjVDRZzb")
+        voice_id = request.args.get('voice_id', '176a55b1-4468-4736-8878-db82729667c1')
+        voice_speed = float(request.args.get('voice_speed', 1.0))
+
+        print('VOICE_ID:', voice_id)
+        if not story_text:
+            return jsonify({"error": "No text provided"}), 400
+        
+        utterances=[
+            PostedUtterance(
+                text=story_text,
+                voice=PostedUtteranceVoiceWithId(id=voice_id, provider='HUME_AI',),
+                speed=voice_speed,
+                description=get_acting_instructions(story_text),
+            )
+        ]
+
+        def generate():
+            print('Generate started...')
+            hume_client = HumeClient(api_key=HUME_API_KEY,)
+            response = hume_client.tts.synthesize_file_streaming(utterances=utterances)
+
+            if response:
+                print('Audio Response Received...')
+            else:
+                print('No Audio Response Received')
+            
+            for chunk in response:
+                yield chunk
+
+        return Response(generate(), mimetype='audio/mpeg')
+    
+
+    except Exception as e:
+        print(f'Hume narration failed: {e}')
+        app.logger.error(f'Hume narrate failed: {e}')
+        return jsonify({'error': str(e)}), 500
+    
+
+@app.route("/api/v1/test_audio_stream", methods=['POST'])
+def test_audio_stream():
+    def generate():
+        with open("hume_ai_sample.mp3", "rb") as f:
+            while chunk := f.read(4096):
+                yield chunk
+    return Response(generate(), mimetype="audio/mpeg")
+
+
+def get_acting_instructions(story_text):
+    acting_prompt = f"""
+    Given this section of a novel, write a one-sentence performance direction describing how it should be spoken
+    (tone, pacing, emotion). Keep it short and descriptive, like: "The voice is breathy, aroused, with rising tension."
+
+    Text:
+    {story_text}
+    """
+    try:
+        acting_response = openai_client.chat.completions.create(
+            model='gpt-4o-mini',
+            messages=[
+                {'role': 'system', 'content': 'You generate voice performance directions for text-to-speech story telling narration.'},
+                {'role': 'user', 'content': acting_prompt}
+            ],
+            temperature=0.7
+        )
+        acting_instructions = acting_response.choices[0].message.content.strip()
+        print('VOICE ACTING INSTRUCTIONS: ', acting_instructions)
+        return acting_instructions
+    except Exception as e:
+        print('Could not get acting instructions, using default...')
+        return 'The voice is breathy, passionate, and romantic.'
+
+
+@app.route('/api/v1/narrate', methods=['GET'])
+def narrate():
+    print(f'NARRATE TRIGGERED ELEVEN LABS: {ELEVEN_API_KEY}>>>')
+    story_text = request.args.get('text')
+    voice_id = request.args.get('voice_id', '176a55b1-4468-4736-8878-db82729667c1')
+    voice_speed = float(request.args.get('voice_speed', 1.0))
+
+    # Check if voice_id is a Hume AI id, if so, switch to default Elevenlabs voice_id
+    if '-' in voice_id:
+        voice_id = 'JBFqnCBsd6RMkjVDRZzb'
 
     if not story_text:
         return jsonify({'error': 'No text provided'}), 400
@@ -92,6 +176,7 @@ def narrate():
                 json={
                     'text': story_text,
                     'model_id': 'eleven_flash_v2',
+                    'voice_speed': voice_speed,
                     'voice_settings': {
                         'stability': 0.0,           # Low stability (closer to 0.0): The voice will sound more expressive, dynamic, and varied — but might sometimes drift in tone, pacing, or even clarity.
                                                     # High stability (closer to 1.0): The voice stays very consistent and “robotically” stable — less emotional nuance, but reliable and predictable.
@@ -458,15 +543,32 @@ def update_account():
         profile['birthdate'] = data['birthdate'].strip() if isinstance(data['birthdate'], str) else data['birthdate']
     if 'email' in data:
         profile['email'] = data['email']
+        
     if 'voice_id' in data:
         profile['voice_id'] = data['voice_id']
+    else:
+        profile['voice_id'] = "15f594d3-0683-4585-b799-ce12e939a0e2"
+
+    if 'voice_speed' in data:
+        profile['voice_speed'] = data['voice_speed']
+    else:
+        profile['voice_speed'] = 1.0
+    
+    if 'turn_offs' in data:
+        profile['turn_offs'] = data['turn_offs']
+    else:
+        profile['turn_offs'] = ''
+
     ds_client.put(profile)
     return jsonify({
         "success": True,
         "profile": {
             "name": profile.get('name', ''),
             "birthdate": profile.get('birthdate', ''),
-            "email": profile.get('email', '')
+            "email": profile.get('email', ''),
+            "voice_id": profile.get('voice_id'),
+            "voice_speed": profile.get('voice_speed'),
+            "turn_offs": profile.get('turn_offs')
         }
     }), 200
 
@@ -479,7 +581,9 @@ def get_user_profile(user):
             user_profile = {
                 'name': profile_entity.get('name', ''),
                 'birthdate': profile_entity.get('birthdate', ''),
-                'voice_id': profile_entity.get('voice_id', 'JBFqnCBsd6RMkjVDRZzb'),
+                'voice_id': profile_entity.get('voice_id', '15f594d3-0683-4585-b799-ce12e939a0e2'),
+                'voice_speed': profile_entity.get('voice_speed', 1.0),
+                'turn_offs': profile_entity.get('turn_offs'),
                 'sub_status': profile_entity.get('sub_status', 'free'),
                 'sub_source': profile_entity.get('sub_source', ''),
                 'sub_id': profile_entity.get('sub_id', ''),
@@ -492,7 +596,7 @@ def get_user_profile(user):
 
 
 @app.route('/api/v1/create_story', methods=['POST'])
-def create_story():
+def create_story_api():
     user, error = get_user_id()
     data = request.get_json()
     if not data:
@@ -526,8 +630,9 @@ def create_story(form_data, user=None, anon_id=None):
         'story': []
     }
     story_set = get_next_story_block(story_set, None)
-    story_set['title'] = story_set['story'][0]['title']
-    del story_set['story'][0]['title']
+    if story_set:
+        story_set['title'] = story_set['story'][0]['title']
+        del story_set['story'][0]['title']
 
     if user:
         story_id = save_story_db(story_set, user)
@@ -536,6 +641,8 @@ def create_story(form_data, user=None, anon_id=None):
         story_id = save_story_anonymous(story_set, anon_id)
 
     update_story_db(story_id, story_set)
+    if story_set['control'] == 'full':
+        story_set = get_full_story(story_id, story_set, user, anon_id)
     return story_id, story_set
 
 
@@ -827,8 +934,6 @@ def get_all_stories_for_user(user):
 
 def get_story(story_id, user, anon_id):
     key = ds_client.key('Story', int(story_id))
-    print('KEY:', key)
-
     try:
         entity = ds_client.get(key)
     except Exception as e:
@@ -838,7 +943,6 @@ def get_story(story_id, user, anon_id):
     print('USER:', user)
     print('ANON:', anon_id)
     print('STORY ID:', story_id)
-    #print('ENTITY:', entity)
     if entity and (user and entity.get('user') == user) or (anon_id and entity.get('anon_id') == anon_id):
         story_set = {
             'story_id': entity.key.id,
@@ -861,6 +965,125 @@ def get_story(story_id, user, anon_id):
     return None
 
 
+def clean_custom_input(user_input: str, min_length: int = 2) -> str | None:
+    """
+    Validate and clean custom story option input.
+    Returns None if input is nonsense (blank, too short, random letters).
+    Otherwise returns the stripped input.
+    """
+
+    if not user_input:
+        return None
+
+    # Strip leading/trailing whitespace
+    cleaned = user_input.strip()
+
+    # Empty after stripping → invalid
+    if not cleaned:
+        return None
+
+    # Too short to be meaningful (default <2 characters)
+    if len(cleaned) < min_length:
+        return None
+
+    # Reject if all characters are the same, like "aaaa"
+    if len(set(cleaned.lower())) == 1:
+        return None
+
+    # Reject if it's just gibberish letters with no vowels
+    if re.fullmatch(r"[bcdfghjklmnpqrstvwxyz]+", cleaned.lower()):
+        return None
+
+    # Passed all checks
+    return cleaned
+
+
+def get_surprise_selections(user_set, story_set, turn_offs):
+    explicitness_map = {
+        "mild": "Mild: Sweet, romantic, fade-to-black intimacy. Focuses on emotion, longing, and gestures.",
+        "medium": "Medium: Steamy and sensual. Some detail in foreplay and passion, but not graphic.",
+        "hot": "Hot: Fully explicit, XXX-rated. Novel will include direct adult terms and graphic sexual detail."
+    }
+    explicitness = explicitness_map.get(story_set['spice'])
+
+    explicitness_request = ''
+    if explicitness:
+        explicitness_request = f'The romance novel will have an explicitnes level of {explicitness}. So make the category selections fitting to this level of explicitness.'
+    
+    turn_offs_request = ''
+    if turn_offs:
+        turn_offs_request = f'DO NOT include anything involving: {turn_offs}.'
+    
+    current_selections = {}
+    selections_needed = {}
+
+    for k, v in user_set.items():
+        if v == 'surprise':
+            selections_needed[k] = v
+        else:
+            current_selections[k] = v
+
+    if not selections_needed:
+        return user_set, story_set
+    #print()
+    #print('START USER SET:', user_set)
+    #print()
+    #print('SELECT NEEDED:', selections_needed)
+    prompt = f"""
+    Invent a cohesive set of romance story settings. These will later be used to create a romance novel.
+    Pick ONE for each category below, making sure they feel like they belong in the same world and tone. 
+    Be creative — you can invent unique personalities/physical descriptors, genres, or archetypes.
+    {explicitness_request}
+    {turn_offs_request}
+
+    1. Genre — pick a unique subgenre of romance novels or something imaginative.
+    2. Relationship type — how the sexual dynamic plays out between the characters.
+    3. Persona — the female main character’s personality, physical characteristics, and vibe.
+    4. Romantic interest personality — the main character’s romantic partner’s personality, physical characteristics, and vibe.
+
+    Return ONLY a JSON object like:
+    {{
+      "genre": "string",
+      "relationship_type": "string",
+      "persona": "string",
+      "romantic_interest_personality": "string"
+    }}
+    """
+    #print('SURPRISE PROMPT:', prompt)
+    resp = openai_client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": "You invent creative, cohesive romance novel story setups."},
+            {"role": "user", "content": prompt}
+        ],
+        temperature=1.0,   # max creativity
+        response_format={ "type": "json_object" }
+    )
+
+    try:
+        selections = json.loads(resp.choices[0].message.content)
+        if selections:
+            # Update story set with generated surprise values
+            for k, v in story_set.items():
+                if v == 'surprise' and k in selections:
+                    story_set[k] = selections[k]
+
+            for k,v in selections_needed.items():
+                if k in selections:
+                    selections_needed[k] = selections[k]
+            mod_user_set = current_selections | selections_needed
+            #print('GEN SELECTS:', selections)
+            print('MOD USER SET:', mod_user_set)
+            
+            return mod_user_set, story_set
+    except Exception as e:
+        print("❌ Failed to parse surprise selections:", e)
+        print("❌ JSON decode failed:", e, "Raw content:", resp.choices[0].message.content)
+    # include random selection from the regular mapped set, if openai fails
+    print('OpenAI failed to return surprise selections, selections is None')
+    return user_set, story_set
+
+
 def map_user_set(story_set):
     """ Map user selections to specific prompt friendly variables """
     rel_type = story_set['relationship_type']
@@ -872,7 +1095,13 @@ def map_user_set(story_set):
         'romantic_thriller': "Romantic Thriller: Suspenseful, high-stakes danger with slow-burning attraction and betrayal.",
         'romantic_comedy': "Romantic Comedy: Funny, witty banter with awkward mishaps that blossoms into love and romantic encounters."
     }
-    genre = genre_map.get(story_set['genre'])
+    if story_set['genre'] in genre_map:
+        genre = genre_map.get(story_set['genre'])
+    else:
+        genre = clean_custom_input(story_set['genre'])
+        if not genre:
+            story_set['genre'] = 'surprise'
+            genre = story_set['genre']
 
     relationship_type_map = {
         'traditional': "Traditional Romance: Single romantic interest, deep emotional arc, steady growth to commitment.",
@@ -882,19 +1111,26 @@ def map_user_set(story_set):
         'open_relationship': "Open Relationship: Consensual, non-exclusive. Interwoven connections and boundary negotiation.",
         'enemies_to_lovers': "Enemies to Lovers: High-conflict, charged banter that flips into intense passion."
     }
-    relationship_type = relationship_type_map.get(story_set['relationship_type'])
+    if story_set['relationship_type'] in relationship_type_map:
+        relationship_type = relationship_type_map.get(story_set['relationship_type'])
+    else:
+        relationship_type = clean_custom_input(story_set['relationship_type'])
+        if not relationship_type:
+            story_set['relationship_type'] = 'surprise'
+            relationship_type = story_set['relationship_type']
 
     # Overall length map (total paragraphs for story)
     plot_length_map = {
-        'quicky': 20,
-        'novella': 100,
-        'novel': 500,
-        'epic': 1000
+        'quicky': 24,
+        'novella': 96,
+        'novel': 496,
+        'epic': 992
     }
     total_blocks = plot_length_map.get(story_set['length'])
 
     # Control map (paragraphs per block "user decision")
     control_map = {
+            'full': 8,
             'low': 8,
             'medium': 4,
             'high': 2
@@ -907,7 +1143,7 @@ def map_user_set(story_set):
         'hot': 
             """
             Hot: Fully explicit smut, XXX-rated. 
-            You must use direct adult terms: penis, clitoris, vagina, cock, pussy, nipples, moans, thrusts, fluids, cum, orgasm. 
+            You must use direct adult terms: penis, clitoris, vagina, cock, pussy, nipples, moans, thrusts, fluids, cum, orgasm, and any other words typically associated with adult level content. 
             Always describe penetration, friction, body position, physical sensation, and climax in graphic detail. 
             Never fade to black or imply — show everything physically and emotionally.
             Never use vague words like “his thing” or “her entrance”; always name body parts directly.
@@ -923,13 +1159,19 @@ def map_user_set(story_set):
     author_type = author_type_map.get(story_set['spice'])
 
     persona_map = {
-        "sweetheart": "Sweetheart: Warm, innocent -  but eager for more temptation. ",
+        "sweetheart": "Sweetheart: Warm, innocent -  but eager for more temptation.",
         "badass": "Badass: Bold, sarcastic fierce.",
         "flirt": "Flirt: Playful, magnetic, witty.",
         "brooding": "Brooding: Guarded, intense, slow to trust.",
         "chaotic": "Wildcard: Impulsive, unpredictable, fun."
     }
-    persona = persona_map.get(story_set['persona'])
+    if story_set['persona'] in persona_map:
+        persona = persona_map.get(story_set['persona'])
+    else:
+        persona = clean_custom_input(story_set['persona'])
+        if not persona:
+            story_set['persona'] = 'surprise'
+            persona = story_set['persona']
     
     romantic_interest_personality_map = {
         'protector': "Protector: Strong, loyal. Shows love through actions.",
@@ -938,23 +1180,30 @@ def map_user_set(story_set):
         'grump': "Grump: Sarcastic, secretly devoted.",
         'golden': "Golden Retriever: Playful, loyal, warm energy."
     }
-    romantic_interest_personality = romantic_interest_personality_map.get(story_set['romantic_interest_personality'])
+    if story_set['romantic_interest_personality'] in romantic_interest_personality_map:
+        romantic_interest_personality = romantic_interest_personality_map.get(story_set['romantic_interest_personality'])
+    else:
+        romantic_interest_personality = clean_custom_input(story_set['romantic_interest_personality'])
+        if not romantic_interest_personality:
+            story_set['romantic_interest_personality'] = 'surprise'
+            romantic_interest_personality = story_set['romantic_interest_personality']
     
     # Build string for describing romantic interest personalities IF one of the relationship types include more than one romantic interest
     vary_rel_types = ['reverse_harem', 'mmf', 'ffm', 'open_relationship']
     second_rel_personality_options = ""
-    if rel_type in vary_rel_types:
-        option_num = 1
-        for k, v in romantic_interest_personality_map.items():
-            second_rel_personality_options += ' ' + str(option_num) + ': ' + v + '\n'
-            option_num += 1
-        romantic_interest_personality = f"""
-        The main romantic interest's personality should be {romantic_interest_personality}. 
-        Any additional romantic interest personalities should be creatively chosen from the following list:
-        {second_rel_personality_options}"""
-    else:
-        romantic_interest_personality = f"The main romantic interest's personality should be {romantic_interest_personality}."
-
+    if romantic_interest_personality != 'surprise':
+        if rel_type in vary_rel_types:
+            option_num = 1
+            for k, v in romantic_interest_personality_map.items():
+                second_rel_personality_options += ' ' + str(option_num) + ': ' + v + '\n'
+                option_num += 1
+            romantic_interest_personality = f"""
+            The main romantic interest's personality should be {romantic_interest_personality}.
+            Make up any additional personalities for the other romantic interests. Ensure they stay consistent based on the previous summaries.
+            """
+        else:
+            romantic_interest_personality = f"The main romantic interest's personality should be {romantic_interest_personality}."
+    #Any additional romantic interest personalities should be creatively chosen from the following list:{second_rel_personality_options}
     #print('REL PERSONALITY CREATED: ', romantic_interest_personality)
     # Build final user setting map
     user_set = {
@@ -971,6 +1220,22 @@ def map_user_set(story_set):
 
 
 def get_next_story_block(story_set, choice=None):
+    user, error = get_user_id()
+    if error:
+        return error
+    user_profile = get_user_profile(user)
+    turn_offs = user_profile.get('turn_offs')
+    turn_offs_description = ''
+    if turn_offs:
+        cleaned = turn_offs.strip()
+        if not cleaned or len(cleaned) < 2 or cleaned.isalpha() and len(cleaned) <= 4:
+            turn_offs = None
+        else:
+            turn_offs_description = f"""
+            Under no circumstances should the story text include or reference: {turn_offs}. 
+            If the text requests them, ignore or redirect to an alternative that still enables the story to flow and makes sense.
+            """
+
     user_set = map_user_set(story_set)
     genre = user_set['genre']
     relationship_type = user_set['relationship_type']
@@ -1050,7 +1315,6 @@ def get_next_story_block(story_set, choice=None):
             \"{user_choice}\"
 
             Write the next part of the story ({paragraphs_per_block} paragraphs), continuing naturally from the reader's choice.
-            This block should reflect the current arc: build tension toward the climax. The final conclusion should resolve within the last {paragraphs_per_block} paragraphs.
             Let the reader's choice guide the continuation of the next part of the story you are writing now. But make sure the explicitness and graphic detail is {spice}
 
             Important:
@@ -1062,6 +1326,16 @@ def get_next_story_block(story_set, choice=None):
             """.strip()
 
     else:
+        user_set, story_set = get_surprise_selections(user_set, story_set, turn_offs)
+        genre = user_set['genre']
+        relationship_type = user_set['relationship_type']
+        total_paragraphs = user_set['length']
+        paragraphs_per_block = user_set['control']
+        spice = user_set['spice']
+        author_type = user_set['author_type']
+        persona = user_set['persona']
+        romantic_interest_personality = user_set['romantic_interest_personality']
+
         # Initial story creation, first plot block
         prompt = f"""
         Write the opening of the story, which should be {paragraphs_per_block} paragraphs.
@@ -1083,8 +1357,11 @@ def get_next_story_block(story_set, choice=None):
         Genre of the story should be: {genre}
         Relationship type(s) in story: {relationship_type}
         FMC Persona: {persona}
-        Personality types of love interest(s): {romantic_interest_personality}
+        Personality type(s) or description(s) of love interest(s): {romantic_interest_personality}
+        {turn_offs_description}
         
+        Include plenty of dialog between characters and physical descriptions of the characters and settings to make the plot feel alive and real.
+
         • Never mention, foreshadow, or allude to decision points or branching paths in the narrative itself;  
         all branching lives strictly in the `"choices"` array.
 
@@ -1104,7 +1381,9 @@ def get_next_story_block(story_set, choice=None):
 
     """.strip()
 
-
+    #print('PROMPT:', prompt)
+    print('STATIC:', STATIC_SYSTEM_INSTRUCTIONS)
+    #print('MODERA:', check_moderation(prompt))
     response = openai_client.chat.completions.create(
         model="gpt-4o",
         messages=[
@@ -1114,20 +1393,28 @@ def get_next_story_block(story_set, choice=None):
         temperature=0.9,
         response_format={ "type": "json_object" }
     )
+    #print('RESPONSE:', response)
     try:
         text = response.choices[0].message.content
         if not text:
-            flash("Oops! Something went wrong. Try selecting your choice again to continue your story.")
-            raise ValueError("OPenAI response returned no content.")
+            raise ValueError("OpenAI response returned no content.")
         story_block = json.loads(text)
     except (json.JSONDecodeError, TypeError, ValueError) as e:
         print("JSON parsing error:", e)
         print("Response text was:", text)
-        flash("Oops! Something went wrong. Try selecting your choice again to continue your story.")
         return story_set
-    
     story_set['story'].append(story_block)
     return story_set
+
+
+def get_full_story(story_id, story_set, user, anon_id):
+    # Stop recursion when story is over
+    if story_set['story'][-1]['choices'][0]['decision'] == '':
+        return story_set
+    else:
+        decision = random.choice(story_set['story'][-1]['choices'])
+        story_id, story_set = choose_path(story_id, decision, user, anon_id)
+        return get_full_story(story_id, story_set, user, anon_id)
 
 
 # Check if prompt violates OpenAI's moderation policies
@@ -1138,7 +1425,7 @@ def check_moderation(input_text: str):
     )
     flagged = response.results[0].flagged
     categories = response.results[0].categories
-    print(response, categories)
+    #print(response, categories)
     return flagged, categories
 
 
@@ -1157,5 +1444,3 @@ def cleanup_anonymous():
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=8080, debug=True)
-
-    #app.run(debug=True)
