@@ -8,7 +8,7 @@ function CreateStory({currentUser, userProfile, apiBaseURL, onLoginClick}) {
     const [showAgeModal, setShowAgeModal] = useState(false);
     const [pendingSpice, setPendingSpice] = useState(null);
 
-    const [length, setLength] = useState('');
+    const [length, setLength] = useState('quicky');
     const [control, setControl] = useState('');
     const [spice, setSpice] = useState('');
 
@@ -56,10 +56,10 @@ function CreateStory({currentUser, userProfile, apiBaseURL, onLoginClick}) {
     }
 
     const [storyOptions, setStoryOptions] = useState({
-        genre: "",
-        relationshipType: "",
-        persona: "",
-        romanticInterestPersonality: "",
+        genre: "suprise",
+        relationshipType: "suprise",
+        persona: "suprise",
+        romanticInterestPersonality: "suprise",
         customGenre: "",
         customRelationshipType: "",
         customPersona: "",

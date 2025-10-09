@@ -20,7 +20,7 @@ import { signInWithEmailAndPassword, onAuthStateChanged } from 'firebase/auth';
 const apiBaseURL =
   window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
     ? "http://127.0.0.1:8080"
-    : "http://192.168.4.131:8080";
+    : "http://192.168.4.145:8080";
 
 function App() {
   const [stories, setStories] = useState([]);

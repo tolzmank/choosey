@@ -11,6 +11,7 @@ function MyStories({stories, currentUser, userProfile, setStories, apiBaseURL, o
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [storyToDelete, setStoryToDelete] = useState(null);
 
+
     useEffect(() => {
         if (!currentUser) {
             const anonId = localStorage.getItem("anon_id");
@@ -101,6 +102,14 @@ function MyStories({stories, currentUser, userProfile, setStories, apiBaseURL, o
     };
 
     const renderStories = () => {
+        if (currentUser && !userProfile) {
+            return (
+                <div id="loading-overlay">
+                <div className="loading-spinner"></div>
+                <p>Loading your stories...</p>
+                </div>
+            );
+        }
         if (currentUser) {
             if (userProfile?.sub_status === 'unlimited') {
                 return (
@@ -113,6 +122,13 @@ function MyStories({stories, currentUser, userProfile, setStories, apiBaseURL, o
                                     <Link to={`/read_story/${story_set.id}`} state={{ storySet: story_set }}>
                                         {story_set.title}
                                     </Link>
+                                </td>
+                                <td style={{ textAlign: 'right', width: '30px' }} >
+                                    {story_set.audiobook_url ? (
+                                        story_set.audiobook_duration > 0 ? (
+                                            `${Math.round((story_set.audiobook_progress / story_set.audiobook_duration) * 100)}%`
+                                        ) : ('')
+                                    ) : ('')}
                                 </td>
                                 <td>
                                     {new Date(story_set.last_modified).toLocaleString('en-US', {
@@ -243,9 +259,9 @@ function MyStories({stories, currentUser, userProfile, setStories, apiBaseURL, o
                             </tr>
                         ))
                     ) : (
-                        // fallback
+                        // fallback - Anon stories message
                         <tr>
-                            <td>Anon No stories yet</td>
+                            <td>No stories yet</td>
                         </tr>
                     )}
                         <tr>
@@ -257,8 +273,6 @@ function MyStories({stories, currentUser, userProfile, setStories, apiBaseURL, o
                             </td>
                         </tr>
                     </>
-
-
                 )
             } else {
                 return (
@@ -277,6 +291,7 @@ function MyStories({stories, currentUser, userProfile, setStories, apiBaseURL, o
                     <th onClick={() => handleSort('title')} style={{cursor:'pointer'}}>
                         Title {sortKey==='title' ? (sortOrder==='asc'?'▲':'▼') : ''}
                     </th>
+                    <th style={{ width: '30px' }} nosort>🎧</th>
                     <th onClick={() => handleSort('last_modified')} style={{cursor:'pointer'}}>
                         Last Modified {sortKey==='last_modified' ? (sortOrder==='asc'?'▲':'▼') : ''}
                     </th>

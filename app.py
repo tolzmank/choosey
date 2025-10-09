@@ -8,7 +8,7 @@ import io
 import uuid
 from datetime import datetime, timezone, timedelta
 import pytz
-
+from mutagen.mp3 import MP3
 import json
 from dotenv import load_dotenv
 load_dotenv()
@@ -18,6 +18,10 @@ import stripe
 # Google Cloud Datastore
 from google.cloud import datastore, secretmanager
 ds_client = datastore.Client(project="choosey-473722")
+
+# Google Cloud Storage Bucket
+from google.cloud import storage
+storage_client = storage.Client(project="choosey-473722")
 
 # Firebase Authentication
 import firebase_admin
@@ -73,6 +77,170 @@ def index():
     return jsonify({'status': 'Choosey API is running'})
 
 
+def generate_audio_surplus_text(surplus_text_queue, hume_client, voice_id, voice_speed):
+    try:
+        utterances=[
+            PostedUtterance(
+                text=surplus_text_queue,
+                voice=PostedUtteranceVoiceWithId(id=voice_id, provider='HUME_AI',),
+                speed=voice_speed,
+                description=get_acting_instructions(surplus_text_queue),
+            )
+        ]
+        response = hume_client.tts.synthesize_file_streaming(utterances=utterances)
+        return response
+    except Exception as e:
+            print(f"❌ Audiobook generation failed: {e}")
+            app.logger.error(f"Hume audiobook generation failed: {e}")
+    return None
+    
+
+
+@app.route('/api/v1/generate_audiobook/<int:story_id>', methods=['POST'])
+def generate_audiobook(story_id):
+    print('GENERATE AUDIOBOOK TRIGGERED >>>')
+    user, error = get_user_id()
+    if error and 'anon_id' not in request.headers:
+        return error
+    user_profile = get_user_profile(user)
+
+    anon_id = request.headers.get('anon_id')
+    story_set = get_story(story_id, user, anon_id)
+    voice_id = user_profile.get('voice_id', '176a55b1-4468-4736-8878-db82729667c1')
+    voice_speed = user_profile.get('voice_speed', 1.0)
+    
+    audio_chunks = []
+    hume_client = HumeClient(api_key=HUME_API_KEY,)
+    surplus_text_queue = []
+    print("Synthesizing audiobook via Hume...")
+    for story_block in story_set['story']:
+        story_text = story_block['text']
+
+        # Generate audio for any text that did not fit from the previous story block
+        while surplus_text_queue:
+            print('Generating from surplus text queue...')
+            text_block = surplus_text_queue.pop(0)
+            surplus_response = generate_audio_surplus_text(text_block, hume_client, voice_id, voice_speed)
+            if surplus_response:
+                for chunk in surplus_response:
+                    audio_chunks.append(chunk)
+
+        # If story block text goes over max char limit, split up story block text into < 5000 char blocks and queue
+        max_char_limit = 5000
+        if len(story_text) > max_char_limit - 5:   # 5 character buffer
+            print(f'Text block over max limit, chars: {len(story_text)} / {max_char_limit}' )
+            words = story_text.split()
+            current_line = ''
+
+            for word in words:
+                if len(current_line) + len(word) + 1 <= max_char_limit:
+                    current_line += (" " if current_line else "") + word
+                else:
+                    surplus_text_queue.append(current_line)
+                    current_line = word
+            if current_line:
+                surplus_text_queue.append(current_line)
+            print(f'Added {len(surplus_text_queue)} text blocks to surplus queue.')
+            if surplus_text_queue:
+                story_text = surplus_text_queue.pop(0)
+
+        try:
+            utterances=[
+                PostedUtterance(
+                    text=story_text,
+                    voice=PostedUtteranceVoiceWithId(id=voice_id, provider='HUME_AI',),
+                    speed=voice_speed,
+                    description=get_acting_instructions(story_block['text']),
+                )
+            ]
+
+            # Stream audio and collect chunks
+            response = hume_client.tts.synthesize_file_streaming(utterances=utterances)
+
+            for chunk in response:
+                audio_chunks.append(chunk)
+            
+        except Exception as e:
+            print(f"❌ Audiobook generation failed: {e}")
+            app.logger.error(f"Hume audiobook generation failed: {e}")
+            # return jsonify({"error": str(e)}), 500
+
+    if not audio_chunks:
+        print('Failed to synthesize audio')
+        return jsonify({'error': 'Failed to synthesize audio'}), 500
+    
+    audio_data = b"".join(audio_chunks)
+
+    # Save to Google Cloud Storage Bucket
+    print('Uploading to GCS bucket...')
+    bucket_name = os.getenv('GCS_AUDIO_BUCKET', 'choosey-473722.appspot.com')
+    bucket = storage_client.bucket(bucket_name)
+    filename=f'{story_id}_{uuid.uuid4().hex}.mp3'
+    blob = bucket.blob(filename)
+    blob.upload_from_string(audio_data, content_type='audio/mpeg')
+    blob.make_public()
+
+    # Get audio file duration
+    audio_file = io.BytesIO(audio_data)
+    audio_info = MP3(audio_file)
+    audio_duration = int(audio_info.info.length)
+
+    # Update Datastore record
+    key = ds_client.key('Story', story_id)
+    entity = ds_client.get(key)
+    entity['audiobook_url'] = blob.public_url
+    entity['audiobook_progress'] = 0
+    entity['audiobook_duration'] = audio_duration
+    ds_client.put(entity)
+    print(f"✅ Audiobook saved to: {blob.public_url}")
+    return jsonify({"audiobook_url": blob.public_url}), 200
+    
+    
+@app.route('/api/v1/get_audiobook/<int:story_id>', methods=['GET'])
+def get_audiobook(story_id):
+    user, error = get_user_id()
+    if error and 'anon_id' not in request.headers:
+        return error
+    anon_id = request.headers.get('anon_id')
+    key = ds_client.key('Story', int(story_id))
+    entity = ds_client.get(key)
+    if not entity:
+        return jsonify({"error": "Story not found"}), 404
+    
+    audiobook_url = entity.get('audiobook_url')
+    audiobook_progress = entity.get('audiobook_progress', 0)
+    audiobook_duration = entity.get('audiobook_duration', 0)
+    return jsonify({
+        'audiobook_url': audiobook_url, 
+        'audiobook_progress': audiobook_progress,
+        'audiobook_duration': audiobook_duration
+        }), 200
+
+
+@app.route('/api/v1/update_audiobook_progress', methods=['POST'])
+def update_audiobook_progress():
+    user, error = get_user_id()
+    if error and "anon_id" not in request.headers:
+        return error
+    
+    data = request.get_json() or {}
+    story_id = data.get('story_id')
+    progress = data.get('progress_in_seconds', 0)
+
+    if not story_id:
+        return jsonify({"error": "Missing story_id"}), 400
+
+    key = ds_client.key("Story", int(story_id))
+    entity = ds_client.get(key)
+    if not entity:
+        return jsonify({"error": "Story not found"}), 404
+    
+    entity['audiobook_progress'] = progress
+    print('AUDIOBOOK PROGRESS:', progress)
+    ds_client.put(entity)
+    return jsonify({'success': True}), 200
+
+
 @app.route('/api/v1/narrate_hume', methods=['GET'])
 def narrate_hume():
     print(f'NARRATE HUME TRIGGERED: {HUME_API_KEY} >>>')
@@ -95,7 +263,7 @@ def narrate_hume():
         ]
 
         def generate():
-            print('Generate started...')
+            print('Generate voice started...')
             hume_client = HumeClient(api_key=HUME_API_KEY,)
             response = hume_client.tts.synthesize_file_streaming(utterances=utterances)
 
@@ -114,15 +282,6 @@ def narrate_hume():
         print(f'Hume narration failed: {e}')
         app.logger.error(f'Hume narrate failed: {e}')
         return jsonify({'error': str(e)}), 500
-    
-
-@app.route("/api/v1/test_audio_stream", methods=['POST'])
-def test_audio_stream():
-    def generate():
-        with open("hume_ai_sample.mp3", "rb") as f:
-            while chunk := f.read(4096):
-                yield chunk
-    return Response(generate(), mimetype="audio/mpeg")
 
 
 def get_acting_instructions(story_text):
@@ -143,7 +302,7 @@ def get_acting_instructions(story_text):
             temperature=0.7
         )
         acting_instructions = acting_response.choices[0].message.content.strip()
-        print('VOICE ACTING INSTRUCTIONS: ', acting_instructions)
+        #print('VOICE ACTING INSTRUCTIONS: ', acting_instructions)
         return acting_instructions
     except Exception as e:
         print('Could not get acting instructions, using default...')
@@ -510,17 +669,34 @@ def delete_account():
     except Exception as e:
         if profile and profile.get('sub_status') == 'unlimited':
             logging.error(f'Error canceling Stripe subscription: {e}')
+
     # Delete Firebase user
     try:
         firebase_auth.delete_user(user)
     except Exception as e:
         print(f"Error deleting Firebase user: {e}")
-    # Delete all stories for user
+
+    # Delete audiobooks
     query = ds_client.query(kind='Story')
     query.add_filter('user', '=', user)
+    for entity in query.fetch():
+        audiobook_url = entity.get('audiobook_url')
+        if audiobook_url and 'storage.googleapis.com' in audiobook_url:
+            try:
+                filename = audiobook_url.split('/')[-1]
+                bucket_name = os.getenv('GCS_AUDIO_BUCKET', 'choosey-473722.appspot.com')
+                bucket = storage_client.bucket(bucket_name)
+                blob = bucket.blob(filename)
+                if blob.exists():
+                    blob.delete()
+                    print(f"Deleted audiobook file: {filename}")
+            except Exception as e:
+                logging.error(f"Failed to delete audiobook file {filename}: {e}")
+    # Delete all stories for user
     keys = [entity.key for entity in query.fetch()]
     if keys:
         ds_client.delete_multi(keys)
+
     # Delete the user's profile entry
     profile_key = ds_client.key('UserProfile', user)
     ds_client.delete(profile_key)
@@ -618,6 +794,10 @@ def create_story_api():
 
 
 def create_story(form_data, user=None, anon_id=None):
+    print('CREATE STORY TRIGGERED >>>')
+    print('USER:', user)
+    print('ANON ID:', anon_id)
+
     # Map user input
     story_set = {
         'genre': form_data.get('genre'),
@@ -629,7 +809,10 @@ def create_story(form_data, user=None, anon_id=None):
         'romantic_interest_personality': form_data.get('romantic_interest_personality'),
         'story': []
     }
+    print()
+    print('STORY_SET START:', story_set)
     story_set = get_next_story_block(story_set, None)
+
     if story_set:
         story_set['title'] = story_set['story'][0]['title']
         del story_set['story'][0]['title']
@@ -913,6 +1096,20 @@ def delete_user_story(story_id, user):
             # Delete the Datastore entity
             ds_client.delete(key)
             print(f'Story ID: {story_id} deleted')
+            
+            # Delete the audiobook (if exists)
+            audiobook_url = entity.get('audiobook_url')
+            if audiobook_url and 'storage.googleapis.com' in audiobook_url:
+                try:
+                    filename = audiobook_url.split('/')[-1]
+                    bucket_name = os.getenv('GCS_AUDIO_BUCKET', 'choosey-473722.appspot.com')
+                    bucket = storage_client.bucket(bucket_name)
+                    blob = bucket.blob(filename)
+                    if blob.exists():
+                        blob.delete()
+                        print(f'Deleted audiobook file: {filename}')
+                except Exception as e:
+                    logging.error(f'Failed to delete audiobook file {filename}: {e}')
             return True
         return False
     
@@ -957,7 +1154,10 @@ def get_story(story_id, user, anon_id):
             'story': json.loads(entity.get('story', '[]')),
             'created_at': entity.get('created_at'),
             'last_modified': entity.get('last_modified'),
-            'anon_id': anon_id
+            'anon_id': anon_id,
+            'audiobook_progress': entity.get('audiobook_progress', 0),
+            'audiobook_url': entity.get('audiobook_url'),
+            'audiobook_duration': entity.get('audiobook_duration', 0)
         }
         #print('STORY SET:', story_set)
         return story_set
@@ -999,6 +1199,7 @@ def clean_custom_input(user_input: str, min_length: int = 2) -> str | None:
 
 
 def get_surprise_selections(user_set, story_set, turn_offs):
+    print('GET SURPRISE SELECTIONS TRIGGERED...')
     explicitness_map = {
         "mild": "Mild: Sweet, romantic, fade-to-black intimacy. Focuses on emotion, longing, and gestures.",
         "medium": "Medium: Steamy and sensual. Some detail in foreplay and passion, but not graphic.",
@@ -1073,7 +1274,7 @@ def get_surprise_selections(user_set, story_set, turn_offs):
                     selections_needed[k] = selections[k]
             mod_user_set = current_selections | selections_needed
             #print('GEN SELECTS:', selections)
-            print('MOD USER SET:', mod_user_set)
+            #print('MOD USER SET:', mod_user_set)
             
             return mod_user_set, story_set
     except Exception as e:
@@ -1082,6 +1283,19 @@ def get_surprise_selections(user_set, story_set, turn_offs):
     # include random selection from the regular mapped set, if openai fails
     print('OpenAI failed to return surprise selections, selections is None')
     return user_set, story_set
+
+
+def get_estimated_paragraph_count(story_set):
+    words_per_para = 90
+    count = 0
+    if story_set:
+        for story_block in story_set:
+            words = story_block['text'].split()
+            count += len(words)
+            paragraph_count = round(count / words_per_para)
+        print('PARAGRAPHS:', paragraph_count)
+        return paragraph_count
+    return 0
 
 
 def map_user_set(story_set):
@@ -1126,16 +1340,20 @@ def map_user_set(story_set):
         'novel': 496,
         'epic': 992
     }
+    print('length map:', story_set['length'])
     total_blocks = plot_length_map.get(story_set['length'])
 
     # Control map (paragraphs per block "user decision")
     control_map = {
-            'full': 8,
+            'full': 60,
             'low': 8,
             'medium': 4,
             'high': 2
         }
+    print('control story set:', story_set['control'])
     num_paragraphs_per_block = control_map.get(story_set['control'])
+    if num_paragraphs_per_block > total_blocks:
+        num_paragraphs_per_block = total_blocks
     
     spice_map = {
         'mild': "Mild: Sweet, fade to black. Physical affection implied — no explicit detail.",
@@ -1216,13 +1434,13 @@ def map_user_set(story_set):
         'romantic_interest_personality': romantic_interest_personality,
         'author_type': author_type
         }
+    print('USER SET', user_set)
     return user_set
 
 
 def get_next_story_block(story_set, choice=None):
+    print('GET NEXT STORY BLOCK TRIGGERED...')
     user, error = get_user_id()
-    if error:
-        return error
     user_profile = get_user_profile(user)
     turn_offs = user_profile.get('turn_offs')
     turn_offs_description = ''
@@ -1252,19 +1470,23 @@ def get_next_story_block(story_set, choice=None):
         summary = story_set['story'][-1]['summary']
         user_choice = choice.get('decision')
 
-        paragraphs_used = len(story_set['story']) * paragraphs_per_block
+        paragraphs_used = get_estimated_paragraph_count(story_set['story'])
         paragraphs_remaining = total_paragraphs - paragraphs_used
+        if paragraphs_remaining < 0:
+            paragraphs_remaining = 0
+        if paragraphs_remaining < paragraphs_per_block:
+            paragraphs_per_block = paragraphs_remaining
+
         if paragraphs_remaining <= paragraphs_per_block:
             # Last plot block, wrap up story, no more choices
             prompt = f"""
             You are writing the last {paragraphs_remaining} paragraphs of the conclusion of a story. 
 
-            Write the last part of the story ({paragraphs_per_block} paragraphs), continuing naturally from the reader's choice.
+            Write the last part of the story ({paragraphs_remaining} paragraphs), continuing naturally from the reader's choice.
             Let the reader's choice guide the continuation of the next part of the story you are writing now.
-            But for now, the next section of the story, which should be {paragraphs_per_block} paragraphs.
-            Currently, the story's length is {len(plot_blocks) * paragraphs_per_block} paragraphs long.
-            So as the story is now, the story is { ((len(plot_blocks) * paragraphs_per_block) / total_paragraphs) * 100 }% of the way complete.
-            This section of the story you write should resolve the absolute final conclusion of the story.
+            Currently, the story's length is {paragraphs_used} paragraphs long.
+            So as the story is now, the story is { round((paragraphs_used / total_paragraphs) * 100) }% of the way complete.
+            This section of the story you write should resolve the absolute final conclusion of the story by the end of it.
         
             Here is a story summary so far:
             \"{summary}\"
@@ -1301,8 +1523,8 @@ def get_next_story_block(story_set, choice=None):
             This story will be built in sections. 
             So the overall length of this story when completed should total to {total_paragraphs} paragraphs.
             But for now, write the next section of the story, which should be {paragraphs_per_block} paragraphs.
-            Currently, the story's length is {len(plot_blocks) * paragraphs_per_block} paragraphs long. The total length of the story when it's done will need to be {total_paragraphs}.
-            So as the story is now, the story is { ((len(plot_blocks) * paragraphs_per_block) / total_paragraphs) * 100 }% of the way complete.
+            Currently, the story's length is {paragraphs_used} paragraphs long. The total length of the story when it's done will need to be {total_paragraphs}.
+            So as the story is now, the story is { round((paragraphs_used / total_paragraphs) * 100) }% of the way complete.
             So, based on where the plot's current phase is (intro, arc, or conclusion), the next section you will write needs to reflect the current phase of the story, while progressing the plot based on the percentage of the story's progress, keeping in mind the total paragraph limit for the story.
 
             Here is a story summary so far:
@@ -1319,7 +1541,7 @@ def get_next_story_block(story_set, choice=None):
 
             Important:
             - The total length of this story should be about {total_paragraphs} paragraphs total.
-            - You have already used approximately {paragraphs_used} paragraphs.
+            - You have currently used approximately {paragraphs_used} paragraphs.
             - That means you have ~{paragraphs_remaining} paragraphs left to wrap up the full arc.
             - Plan the pacing and narrative arcs accordingly — don’t stall or wrap up too fast.
 
@@ -1338,12 +1560,12 @@ def get_next_story_block(story_set, choice=None):
 
         # Initial story creation, first plot block
         prompt = f"""
-        Write the opening of the story, which should be {paragraphs_per_block} paragraphs.
+        Write the first section of the story, which should be {paragraphs_per_block} paragraphs.
 
         This story will be built in sections, like a choose your own adventure style book. 
         So the overall length of this story when completed should total to {total_paragraphs} paragraphs.
-        But for now, only write the opening of the story, 
-        But keep in mind the overall story intro, arc, and conclusion in the future will still be limited to {total_paragraphs} So ensure the plot structure follows this pace.
+        But for now, only write the first {paragraphs_per_block} paragraphs of the story, 
+        But keep in mind the overall story intro, arc, and conclusion in the future will still be limited to {total_paragraphs}. So ensure the plot structure follows this pace.
 
         Make sure the explicitness and graphic detail is {spice}
 
@@ -1381,9 +1603,10 @@ def get_next_story_block(story_set, choice=None):
 
     """.strip()
 
-    #print('PROMPT:', prompt)
+    print('PROMPT:', prompt)
     print('STATIC:', STATIC_SYSTEM_INSTRUCTIONS)
-    #print('MODERA:', check_moderation(prompt))
+    print()
+    print('MODERA:', check_moderation(prompt))
     response = openai_client.chat.completions.create(
         model="gpt-4o",
         messages=[
@@ -1399,11 +1622,21 @@ def get_next_story_block(story_set, choice=None):
         if not text:
             raise ValueError("OpenAI response returned no content.")
         story_block = json.loads(text)
+
+        # Check token usage
+        if hasattr(response, 'usage') and response.usage:
+            print()
+            print(f"Token usage — prompt: {response.usage.prompt_tokens}, completion: {response.usage.completion_tokens}, total: {response.usage.total_tokens}")
+        else:
+            print("⚠️ Token usage info not available for this response.")
+
     except (json.JSONDecodeError, TypeError, ValueError) as e:
         print("JSON parsing error:", e)
         print("Response text was:", text)
         return story_set
     story_set['story'].append(story_block)
+    print('CHARS:', len(story_block['text']))
+    print()
     return story_set
 
 

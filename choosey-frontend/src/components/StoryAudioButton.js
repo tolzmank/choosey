@@ -77,7 +77,7 @@ const StoryAudioButton = ({storyText, apiBaseURL, voiceId, voiceSpeed}) => {
                 <img
                     src={isPlaying ? pauseIcon : playIcon}
                     style={{height: 30}}
-                    alt={isPlaying ? "Pause narration" : "Play narration"}
+                    alt={isPlaying ? "Pause" : "Play"}
                 />
                 </div>
             )}

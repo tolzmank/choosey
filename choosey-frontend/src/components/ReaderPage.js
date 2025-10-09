@@ -4,6 +4,7 @@ import { useLocation, useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import RetryPaymentButton from './RetryPaymentButton';
 import StoryAudioButton from "../components/StoryAudioButton";
+import FullAudiobookBar from "../components/FullAudiobookBar";
 
 function ReaderPage({currentUser, userProfile, apiBaseURL, darkMode, setDarkMode, onLoginClick}) {
     const location = useLocation();
@@ -68,6 +69,15 @@ function ReaderPage({currentUser, userProfile, apiBaseURL, darkMode, setDarkMode
     
     const [localStory, setLocalStory] = useState(storySet);
     const [loading, setLoading] = useState(!storySet);
+    // Full audiobook (lay back mode) states
+    const [abUrl, setAbUrl] = useState(null);
+    const [abProgress, setAbProgress] = useState(0);
+    const [abLoading, setAbLoading] = useState(false);
+    const audioBarRef = useRef(null);
+    const saveDebounceRef = useRef(0);
+
+    const isFullAudiobookMode = localStory?.control === 'full';
+
 
     const anonId = localStory?.anon_id || localStorage.getItem('anon_id');
 
@@ -88,6 +98,8 @@ function ReaderPage({currentUser, userProfile, apiBaseURL, darkMode, setDarkMode
 
         return headers;
     };
+
+
 
     // Refresh story
     useEffect(() => {
@@ -122,7 +134,7 @@ function ReaderPage({currentUser, userProfile, apiBaseURL, darkMode, setDarkMode
         if (id) {
             fetchStory();
         }
-        }, [id, currentUser]);
+    }, [id, currentUser]);
 
 
     const handleGoBack = async () => {
@@ -158,6 +170,10 @@ function ReaderPage({currentUser, userProfile, apiBaseURL, darkMode, setDarkMode
     };
 
     const handleChoice = async (choice) => {
+        // Pause global audiobook if playing
+        // if (audioBarRef.current && !audioBarRef.current.paused) {
+        //   try { audioBarRef.current.pause(); } catch {}
+        // }
         if (!localStory || !localStory.story) return;
         let idToken = null;
         if (currentUser) {
@@ -216,6 +232,15 @@ function ReaderPage({currentUser, userProfile, apiBaseURL, darkMode, setDarkMode
     return (
         <>
         <div className="reader-container">
+            <FullAudiobookBar
+                apiBaseURL={apiBaseURL}
+                id={id}
+                userProfile={userProfile}
+                isFullAudiobookMode={isFullAudiobookMode}
+                darkMode={darkMode}
+                getAuthHeaders={getAuthHeaders}
+            />
+
             <div className="text-controls" id="text-controls">
                 <button className='button-gray-trans' onClick={decreaseFontSize}>
                     <img src='/icons/text_size_decrease.svg' alt="Decrease Text Size" style={{height: 20}}></img>
@@ -259,8 +284,9 @@ function ReaderPage({currentUser, userProfile, apiBaseURL, darkMode, setDarkMode
             {localStory?.story?.map((plotBlock, index) => (
                 <div key={index}>
                     <p style={{fontSize: `${fontSize}px`, lineHeight: lineSpacing,  margin: 10}}>
-                        <StoryAudioButton storyText={plotBlock.text} apiBaseURL={apiBaseURL} voiceId={userProfile?.voice_id || "5bb7de05-c8fe-426a-8fcc-ba4fc4ce9f9c"} voiceSpeed={userProfile?.voice_speed || 1.0}/> {plotBlock.text}</p>
-                    
+                        {!isFullAudiobookMode && (
+                        <StoryAudioButton storyText={plotBlock.text} apiBaseURL={apiBaseURL} voiceId={userProfile?.voice_id || "5bb7de05-c8fe-426a-8fcc-ba4fc4ce9f9c"} voiceSpeed={userProfile?.voice_speed || 1.0}/>)} {plotBlock.text}</p>
+
                     {index === localStory.story.length - 1 && plotBlock.choices && (
                         <>
                             {plotBlock.choices?.[0]?.decision !== "" ? (
