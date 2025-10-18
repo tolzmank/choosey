@@ -1,13 +1,16 @@
-import React from 'react';
+import React, { useState, useRef } from 'react';
 import axios from 'axios';
 import { auth } from '../firebase';
 
 function RetryPaymentButton({ apiBaseURL }) {
+  const [errMsg, setErrMsg] = useState('');
+
   const handleRetryPayment = async () => {
+    setErrMsg('');
     try {
       const user = auth.currentUser;
       if (!user) {
-        alert("You must be logged in to retry payment.");
+        setErrMsg("You must be logged in to retry payment.");
         return;
       }
       const idToken = await user.getIdToken();
@@ -30,14 +33,20 @@ function RetryPaymentButton({ apiBaseURL }) {
       }
     } catch (err) {
       console.error("Error retrying payment:", err);
-      alert("Could not start payment. Please try again.");
+      setErrMsg("Could not start payment. Please try again.");
+
     }
   };
 
   return (
+    <>
     <button className="button" style={{ marginBottom: '30px', marginTop: '0px' }} onClick={handleRetryPayment}>
       Go to Payment
     </button>
+    {errMsg && (
+      <span style={{color: '#8e5656ff', maxWidth: '300px'}}>{errMsg}</span>
+    )}
+    </>
   );
 }
 

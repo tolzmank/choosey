@@ -5,10 +5,27 @@ import axios from 'axios';
 import RetryPaymentButton from './RetryPaymentButton';
 import StoryAudioButton from "../components/StoryAudioButton";
 import FullAudiobookBar from "../components/FullAudiobookBar";
+import StoryInfoModal from './StoryInfoModal';
 
-function ReaderPage({currentUser, userProfile, apiBaseURL, darkMode, setDarkMode, onLoginClick}) {
+function ReaderPage({
+    currentUser, 
+    userProfile, 
+    apiBaseURL, 
+    darkMode, setDarkMode, 
+    onLoginClick, 
+    showAudioBar, setShowAudioBar, 
+    isPlaying, setIsPlaying, 
+    audioRef,
+    setCurrentStoryId,
+    setIsFullAudioBookMode,
+    currentStoryTitle, setCurrentStoryTitle,
+}) {
     const location = useLocation();
     const [showRestartConfirm, setShowRestartConfirm] = useState(false);
+
+    const [showInfoModal, setShowInfoModal] = useState(false);
+    const [selectedStory, setSelectedStory] = useState(null);
+
     const { storySet } = location.state || {};
     const { id } = useParams();
     const loadingRef = useRef(null);
@@ -116,13 +133,48 @@ function ReaderPage({currentUser, userProfile, apiBaseURL, darkMode, setDarkMode
                         headers["anon_id"] = anonId;
                     }
                 }
-
-                const res = await axios.get(`${apiBaseURL}/api/v1/read_story/${id}`, {
-                    headers
-                });
+                const res = await axios.get(`${apiBaseURL}/api/v1/read_story/${id}`, {headers});
 
                 if (res.data && res.data.story_set) {
                     setLocalStory(res.data.story_set);
+                    setCurrentStoryId(res.data.story_set.story_id)
+                    setIsFullAudioBookMode(isFullAudiobookMode)
+                    setCurrentStoryTitle(res.data.story_set.title)
+
+                    // Restore scroll position
+                    const ratio = res.data.scroll_ratio ?? null;
+                    const pos = res.data.scroll_position || localStorage.getItem(`scroll_${res.data.story_set.story_id}`);
+
+                    if (ratio !== null) {
+                        // Wait for DOM render to complete before scrolling
+                        setTimeout(() => {
+                            const checkReady = () => {
+                            const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+                            if (docHeight > 0) {
+                                const newPos = ratio * docHeight;
+                                window.scrollTo({ top: newPos, behavior: 'smooth' });
+                            } else {
+                                requestAnimationFrame(checkReady);
+                            }
+                            };
+                            requestAnimationFrame(checkReady);
+                        }, 300);
+                    } else if (pos) {
+                        const targetPos = Number(pos);
+                        setTimeout(() => {
+                            const checkReady = () => {
+                            const docHeight = document.documentElement.scrollHeight;
+                            if (docHeight > targetPos || docHeight > window.innerHeight + 100) {
+                                window.scrollTo({ top: targetPos, behavior: 'smooth' });
+                            } else {
+                                requestAnimationFrame(checkReady);
+                            }
+                            };
+                            requestAnimationFrame(checkReady);
+                        }, 300);
+                    }
+
+
                 } else {
                     console.warn("Story data not found in response");
                 }
@@ -135,7 +187,6 @@ function ReaderPage({currentUser, userProfile, apiBaseURL, darkMode, setDarkMode
             fetchStory();
         }
     }, [id, currentUser]);
-
 
     const handleGoBack = async () => {
         try {
@@ -214,6 +265,38 @@ function ReaderPage({currentUser, userProfile, apiBaseURL, darkMode, setDarkMode
         }
     }, [id, storySet]);
 
+    useEffect(() => {
+        const handleScroll = async () => {
+            const storyId = Number(id);
+            const scrollPosition = window.scrollY;
+            const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
+
+            // Save scroll position to local storage immediately (for speed)
+            localStorage.setItem(`scroll_${storyId}`, scrollPosition);
+
+            // Throttle updates to backend (every 5 seconds)
+            if (saveDebounceRef.current) return;
+            saveDebounceRef.current = setTimeout(async () => {
+            saveDebounceRef.current = null;
+            try {
+                const headers = await getAuthHeaders();
+                await axios.post(`${apiBaseURL}/api/v1/update_scroll_progress`, {
+                story_id: storyId,
+                scroll_position: scrollPosition,
+                scroll_height: scrollHeight,
+                }, { headers });
+            } catch (err) {
+                console.error("Failed to update scroll progress:", err);
+            }
+            }, 5000);
+        };
+
+        window.addEventListener("scroll", handleScroll);
+        return () => {
+            window.removeEventListener("scroll", handleScroll);
+            if (saveDebounceRef.current) clearTimeout(saveDebounceRef.current);
+        };
+        }, [id, currentUser]);
 
     if (loading && !localStory) {
         // Only show the full-page overlay if story hasn't loaded yet
@@ -232,15 +315,6 @@ function ReaderPage({currentUser, userProfile, apiBaseURL, darkMode, setDarkMode
     return (
         <>
         <div className="reader-container">
-            <FullAudiobookBar
-                apiBaseURL={apiBaseURL}
-                id={id}
-                userProfile={userProfile}
-                isFullAudiobookMode={isFullAudiobookMode}
-                darkMode={darkMode}
-                getAuthHeaders={getAuthHeaders}
-            />
-
             <div className="text-controls" id="text-controls">
                 <button className='button-gray-trans' onClick={decreaseFontSize}>
                     <img src='/icons/text_size_decrease.svg' alt="Decrease Text Size" style={{height: 20}}></img>
@@ -280,13 +354,42 @@ function ReaderPage({currentUser, userProfile, apiBaseURL, darkMode, setDarkMode
             </div>
 
 
-            <p style={{ fontWeight: 700, textAlign: 'center', fontSize: 20 }}>{localStory?.title}</p>
+            <div style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '10px'}}>
+            <button className='button-menu' onClick={() => { setSelectedStory(localStory); setShowInfoModal(true); }} title="Story Info"
+                style={{
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: 0,
+                    display: 'flex',
+                    alignItems: 'center'
+                }}
+            >
+                <img src="/icons/book1.svg" alt="i" style={{ height: '25px' }} />  <p style={{ fontWeight: 700, fontSize: 20, marginLeft: '10px'}}>{localStory?.title}</p>
+            </button>
+
+            </div>
+            
+
             {localStory?.story?.map((plotBlock, index) => (
                 <div key={index}>
-                    <p style={{fontSize: `${fontSize}px`, lineHeight: lineSpacing,  margin: 10}}>
-                        {!isFullAudiobookMode && (
-                        <StoryAudioButton storyText={plotBlock.text} apiBaseURL={apiBaseURL} voiceId={userProfile?.voice_id || "5bb7de05-c8fe-426a-8fcc-ba4fc4ce9f9c"} voiceSpeed={userProfile?.voice_speed || 1.0}/>)} {plotBlock.text}</p>
+                    <div className='story-text'>
+                        <br></br>
+                        <p style={{textAlign: 'center', fontSize: `${fontSize}px`, lineHeight: lineSpacing,  marginTop: 10, marginBottom: -10}}><strong>{index+1}</strong></p>
 
+                        <p style={{fontSize: `${fontSize}px`, lineHeight: lineSpacing,  margin: 10}}>
+                            {!isFullAudiobookMode && (
+                            <StoryAudioButton storyText={plotBlock.text} storyId={id} apiBaseURL={apiBaseURL} voiceId={userProfile?.voice_id || "5bb7de05-c8fe-426a-8fcc-ba4fc4ce9f9c"} voiceSpeed={userProfile?.voice_speed || 1.0}/>)} 
+                                {storySet.story.map((block, i) => {
+                                    const paragraphs = block.text.split(/\n\s*\n/); // split by blank lines
+                                    return paragraphs.map((para, j) => (
+                                    <p key={`${i}-${j}`}>{para.trim()}</p>
+                                    ));
+                                })}
+
+                        </p>
+
+                    </div>
                     {index === localStory.story.length - 1 && plotBlock.choices && (
                         <>
                             {plotBlock.choices?.[0]?.decision !== "" ? (
@@ -383,6 +486,14 @@ function ReaderPage({currentUser, userProfile, apiBaseURL, darkMode, setDarkMode
                     </button>
                 </div>
             )}
+
+            {showInfoModal && (
+                <StoryInfoModal
+                    storySet={storySet}
+                    onClose={() => setShowInfoModal(false)}
+                />
+            )}
+
             {currentUser && userProfile?.sub_status !== 'unlimited' && (
                 <div className='premium-banner'>
                     <>

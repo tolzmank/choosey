@@ -6,12 +6,14 @@ if (!window.activeAudio) {
   window.activeAudio = null;
 }
 
-const StoryAudioButton = ({storyText, apiBaseURL, voiceId, voiceSpeed}) => {
+const StoryAudioButton = ({storyText, storyId, apiBaseURL, voiceId, voiceSpeed}) => {
     const [isPlaying, setIsPlaying] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const audioRef = useRef(null);
+    const [errMsg, setErrMsg] = useState('');
 
     const handlePlayPause = async () => {
+        setErrMsg('');
         if (isPlaying) {
             if (audioRef.current) {
                 audioRef.current.pause();
@@ -25,7 +27,7 @@ const StoryAudioButton = ({storyText, apiBaseURL, voiceId, voiceSpeed}) => {
 
             try {
                 // Stream narration audio directly from backend
-                const audioUrl = `${apiBaseURL}/api/v1/narrate_hume?text=${encodeURIComponent(storyText)}&voice_id=${voiceId}&voice_speed=${voiceSpeed}`;
+                const audioUrl = `${apiBaseURL}/api/v1/narrate_hume?text=${encodeURIComponent(storyText)}&story_id=${storyId}&voice_id=${voiceId}&voice_speed=${voiceSpeed}`;
                 // Only create a new Audio instance if not already present
                 if (!audioRef.current) {
                     audioRef.current = new Audio(audioUrl);
@@ -49,7 +51,7 @@ const StoryAudioButton = ({storyText, apiBaseURL, voiceId, voiceSpeed}) => {
                             window.activeAudio = null;
                         }
                         audioRef.current = null;
-                        alert('Narration failed. Please try again.')
+                        setErrMsg('Could not generate audiobook narration. Please try again later.');
                     });
                 }
                 window.activeAudio = audioRef.current;
@@ -60,7 +62,7 @@ const StoryAudioButton = ({storyText, apiBaseURL, voiceId, voiceSpeed}) => {
                 setIsPlaying(true);
             } catch (err) {
                 console.error("Narration failed:", err);
-                alert("Narration unavailable. Please try again later.");
+                setErrMsg('Could not generate audiobook narration. Please try again later.');
                 setIsLoading(false);
                 setIsPlaying(false);
             }
@@ -68,21 +70,38 @@ const StoryAudioButton = ({storyText, apiBaseURL, voiceId, voiceSpeed}) => {
     };
 
     return (
-        <button onClick={handlePlayPause} className="button-gray" style={{paddingBottom: '4px', paddingTop: '4px'}}>
-            
-            {isLoading ? (
-                <div className="loading-spinner small"></div>
-            ) : (
-                <div className="audio-button-content">
-                <img
-                    src={isPlaying ? pauseIcon : playIcon}
-                    style={{height: 30}}
-                    alt={isPlaying ? "Pause" : "Play"}
-                />
-                </div>
+        <div style={{ display: 'flex', alignItems: 'center', marginLeft: '20px', marginBottom: '10px'}}>
+            <button onClick={handlePlayPause} className="button-gray" style={{paddingBottom: '4px', paddingTop: '4px', marginRight: '0px'}}>
+                
+                {isLoading ? (
+                    <div className="loading-spinner small"></div>
+                ) : (
+                    <div className="audio-button-content">
+                    <img
+                        src={isPlaying ? pauseIcon : playIcon}
+                        style={{height: 30}}
+                        alt={isPlaying ? "Pause" : "Play"}
+                    />
+                    </div>
+                )}
+                
+            </button>
+            {errMsg && (
+                <span
+                    style={{
+                    color: '#8e5656ff',
+                    fontSize: '0.9em',
+                    textIndent: '0em',
+                    marginLeft: '10px',
+                    verticalAlign: 'middle',     // aligns vertically with the button
+                    lineHeight: '1',             // prevents extra top padding
+                    display: 'inline-block',     // removes inherited paragraph spacing
+                    }}
+                >
+                    {errMsg}
+                </span>
             )}
-            
-        </button>
+        </div>
     );
 };
 export default StoryAudioButton;

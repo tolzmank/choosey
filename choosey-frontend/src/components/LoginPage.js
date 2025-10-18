@@ -14,6 +14,7 @@ function LoginPage({onClose, startWithCreateAccount = false, prefill = null}) {
     const [birthdate, setBirthdate] = useState(prefill && prefill.birthdate ? prefill.birthdate : '');
     const [error, setError] = useState('');
     const [birthdateError, setBirthdateError] = useState('');
+    const [displayMsg, setDisplayMsg] = useState('');
 
     // If prefill changes, update fields (for modal re-opening)
     useEffect(() => {
@@ -26,6 +27,7 @@ function LoginPage({onClose, startWithCreateAccount = false, prefill = null}) {
     }, [prefill]);
 
     const handleSignIn = async () => {
+      setDisplayMsg('');
       try {
         const prevPath = localStorage.getItem("postLoginRedirect") || window.location.pathname + window.location.search;
         const userCred = await signInWithEmailAndPassword(auth, email, password);
@@ -59,15 +61,15 @@ function LoginPage({onClose, startWithCreateAccount = false, prefill = null}) {
 
     async function handleForgotPassword(email) {
       if (!email) {
-        alert("Please enter your email address first.");
+        setDisplayMsg("Please enter your email address first.");
         return;
       }
       try {
         await sendPasswordResetEmail(auth, email);
-        alert("Password reset email sent. Check your inbox!");
+        setDisplayMsg("Password reset email sent. Check your inbox.");
       } catch (err) {
         console.error("Error sending reset email:", err);
-        alert(err.message);
+        setDisplayMsg(err.message);
       }
     }
 
@@ -307,6 +309,9 @@ function LoginPage({onClose, startWithCreateAccount = false, prefill = null}) {
                 onClick={() => handleForgotPassword(email)}>
                 Forgot your password?
               </button>
+              {displayMsg && (
+                <span style={{color: '#8e5656ff', maxWidth: '400px'}}>{displayMsg}</span>
+              )}
 
             </>
           )}

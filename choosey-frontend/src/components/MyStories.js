@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import RetryPaymentButton from './RetryPaymentButton';
+import StoryInfoModal from './StoryInfoModal';
 
-function MyStories({stories, currentUser, userProfile, setStories, apiBaseURL, onLoginClick}) {
+function MyStories({stories, currentUser, userProfile, setStories, apiBaseURL, onLoginClick, setCurrentStoryId, setCurrentStoryTitle}) {
 
     // Sorting state
     const [sortKey, setSortKey] = React.useState('last_modified');
@@ -11,6 +12,9 @@ function MyStories({stories, currentUser, userProfile, setStories, apiBaseURL, o
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [storyToDelete, setStoryToDelete] = useState(null);
 
+    const [showInfoModal, setShowInfoModal] = useState(false);
+    const [selectedStory, setSelectedStory] = useState(null);
+    const location = useLocation();
 
     useEffect(() => {
         if (!currentUser) {
@@ -18,8 +22,26 @@ function MyStories({stories, currentUser, userProfile, setStories, apiBaseURL, o
             if (anonId) {
                 fetchAnonStories(apiBaseURL, anonId, setStories);
             }
+        } else if (currentUser) {
+            currentUser.getIdToken().then((idToken) => {
+            axios.get(`${apiBaseURL}/api/v1/my_stories`, {
+                headers: { Authorization: `Bearer ${idToken}` },
+            }).then(res => {
+                const parsedStories = res.data.map(storySet => ({
+                ...storySet,
+                story: typeof storySet.story === 'string'
+                ? JSON.parse(storySet.story)
+                : storySet.story,
+                }));
+            setStories(parsedStories);
+          })
+          .catch(err => console.error(err));
+
+            });
         }
-        }, [currentUser, apiBaseURL]);
+    }, [currentUser, apiBaseURL, location.key]);
+
+
 
     const sortedStories = [...(stories || [])].sort((a, b) => {
         let aVal = a[sortKey];
@@ -97,8 +119,8 @@ function MyStories({stories, currentUser, userProfile, setStories, apiBaseURL, o
                 setStories((prev) => prev.filter((s) => s.id !== storyId));
             })
         }
-        
-
+        setCurrentStoryId('');
+        setCurrentStoryTitle('');
     };
 
     const renderStories = () => {
@@ -118,19 +140,20 @@ function MyStories({stories, currentUser, userProfile, setStories, apiBaseURL, o
                         sortedStories.map((story_set) => (
                             //row
                             <tr key={story_set.id}>
-                                <td>
+                                <td style={{ padding: '0px', width: '15px' }}>
+                                    <button className='button-menu'
+                                        onClick={() => { setSelectedStory(story_set); setShowInfoModal(true); }}
+                                        title="Info"
+                                        style={{ background: 'transparent', border: 'none', cursor: 'pointer', marginTop: '4px'}}>
+                                        <img src="/icons/book1.svg" alt="i" style={{height: '25px'}} />
+                                    </button>
+                                </td>
+                                <td style={{paddingLeft: '5px'}}>
                                     <Link to={`/read_story/${story_set.id}`} state={{ storySet: story_set }}>
                                         {story_set.title}
                                     </Link>
                                 </td>
-                                <td style={{ textAlign: 'right', width: '30px' }} >
-                                    {story_set.audiobook_url ? (
-                                        story_set.audiobook_duration > 0 ? (
-                                            `${Math.round((story_set.audiobook_progress / story_set.audiobook_duration) * 100)}%`
-                                        ) : ('')
-                                    ) : ('')}
-                                </td>
-                                <td>
+                                <td style={{paddingRight: '0px', paddingLeft: '0px'}}>
                                     {new Date(story_set.last_modified).toLocaleString('en-US', {
                                         month: 'short',
                                         day: 'numeric',
@@ -139,7 +162,7 @@ function MyStories({stories, currentUser, userProfile, setStories, apiBaseURL, o
                                         minute: '2-digit',
                                     })}
                                 </td>
-                                <td>
+                                <td style={{paddingRight: '15px', paddingLeft: '15px'}}>
                                     <button
                                         className="delete-button"
                                         title="Delete Story"
@@ -173,10 +196,18 @@ function MyStories({stories, currentUser, userProfile, setStories, apiBaseURL, o
                         sortedStories.map((story_set) => (
                             //row
                             <tr key={story_set.id}>
+                                <td style={{ padding: '0px', width: '15px' }}>
+                                    <button className='button-menu'
+                                        onClick={() => { setSelectedStory(story_set); setShowInfoModal(true); }}
+                                        title="Info"
+                                        style={{ background: 'transparent', border: 'none', cursor: 'pointer', marginTop: '4px'}}>
+                                        <img src="/icons/book1.svg" alt="i" style={{height: '25px'}} />
+                                    </button>
+                                </td>
                                 <td>
                                     {story_set.title}
                                 </td>
-                                <td>
+                                <td style={{paddingRight: '0px', paddingLeft: '0px'}}>
                                     {new Date(story_set.last_modified).toLocaleString('en-US', {
                                         month: 'short',
                                         day: 'numeric',
@@ -185,7 +216,7 @@ function MyStories({stories, currentUser, userProfile, setStories, apiBaseURL, o
                                         minute: '2-digit',
                                     })}
                                 </td>
-                                <td>
+                                <td style={{paddingRight: '15px', paddingLeft: '15px'}}>
                                     <button
                                         className="delete-button"
                                         title="Delete Story"
@@ -232,10 +263,18 @@ function MyStories({stories, currentUser, userProfile, setStories, apiBaseURL, o
                         sortedStories.map((story_set) => (
                             //row
                             <tr key={story_set.id}>
+                                <td style={{ padding: '0px', width: '15px' }}>
+                                    <button className='button-menu'
+                                        onClick={() => { setSelectedStory(story_set); setShowInfoModal(true); }}
+                                        title="Info"
+                                        style={{ background: 'transparent', border: 'none', cursor: 'pointer', marginTop: '4px'}}>
+                                        <img src="/icons/book1.svg" alt="i" style={{height: '25px'}} />
+                                    </button>
+                                </td>
                                 <td>
                                     {story_set.title}
                                 </td>
-                                <td>
+                                <td style={{paddingRight: '0px', paddingLeft: '0px'}}>
                                     {new Date(story_set.last_modified).toLocaleString('en-US', {
                                         month: 'short',
                                         day: 'numeric',
@@ -244,7 +283,7 @@ function MyStories({stories, currentUser, userProfile, setStories, apiBaseURL, o
                                         minute: '2-digit',
                                     })}
                                 </td>
-                                <td>
+                                <td style={{paddingRight: '15px', paddingLeft: '15px'}}>
                                     <button
                                         className="delete-button"
                                         title="Delete Story"
@@ -288,19 +327,30 @@ function MyStories({stories, currentUser, userProfile, setStories, apiBaseURL, o
         <table style={{marginBottom: 100}}>
             <thead>
                 <tr>
-                    <th onClick={() => handleSort('title')} style={{cursor:'pointer'}}>
+                    <th className='no-sort' style={{paddingRight: '0px', paddingLeft: '7px', paddingTop: '0px'}}>
+                        <img src="/icons/info_white.svg" alt="i" style={{height: '20px', marginTop: '5px'}} />
+                    </th>
+                    <th onClick={() => handleSort('title')} style={{cursor:'pointer', paddingLeft: '5px'}}>
                         Title {sortKey==='title' ? (sortOrder==='asc'?'▲':'▼') : ''}
                     </th>
-                    <th style={{ width: '30px' }} nosort>🎧</th>
                     <th onClick={() => handleSort('last_modified')} style={{cursor:'pointer'}}>
                         Last Modified {sortKey==='last_modified' ? (sortOrder==='asc'?'▲':'▼') : ''}
                     </th>
-                    <th></th>
+                    <th className="no-sort"></th>
                 </tr>
             </thead>
             <tbody>
                 {renderStories()}
             </tbody>
+
+
+
+            {showInfoModal && (
+                <StoryInfoModal
+                    storySet={selectedStory}
+                    onClose={() => setShowInfoModal(false)}
+                />
+            )}
 
             {showDeleteConfirm && (
                 <div className="modal-overlay">

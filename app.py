@@ -1,4 +1,5 @@
 import logging
+import threading
 logging.basicConfig(level=logging.INFO)
 import re
 import os
@@ -45,7 +46,7 @@ stripe_response = client.access_secret_version(request={"name": os.environ["STRI
 STRIPE_WEBHOOK = stripe_response.payload.data.decode("UTF-8")
 
 # OpenAI
-from openai import OpenAI
+from openai import OpenAI, BadRequestError, APIError, RateLimitError
 response = client.access_secret_version(request={"name": os.environ["OPENAI_API_KEY_CHOOSEY"]})
 openai_client = OpenAI(api_key=response.payload.data.decode("UTF-8"))
 
@@ -77,21 +78,76 @@ def index():
     return jsonify({'status': 'Choosey API is running'})
 
 
-def generate_audio_surplus_text(surplus_text_queue, hume_client, voice_id, voice_speed):
+@app.route('/api/v1/update_scroll_progress', methods=['POST'])
+def update_scroll_progress():
+    user, anon_id, error = get_user_id()
+    if error and "anon_id" not in request.headers:
+        return error
+    
+    data = request.get_json() or {}
+    story_id = data.get('story_id')
+    scroll_position = float(data.get('scroll_position'))
+    scroll_height = float(data.get('scroll_height', 1))
+
+    if not story_id:
+        return jsonify({'error': 'Missing story_id'}), 400
+
+    key = ds_client.key('Story', int(story_id))
+    entity = ds_client.get(key)
+    if not entity:
+        return jsonify({'error': 'Story not found'}), 404
+    
+    story_user = entity.get('user')
+    story_anon_id = entity.get('anon_id')
+    if (user and story_user == user) or (anon_id and story_anon_id == anon_id):
+        # Save position and height to calculate relative scroll progress
+        ratio = scroll_position / scroll_height if scroll_height > 0 else 0.0
+        entity['scroll_position'] = scroll_position
+        entity['scroll_height'] = scroll_height
+        entity['scroll_ratio'] = ratio
+        entity['last_modified'] = datetime.now(timezone.utc)
+        ds_client.put(entity)
+        return jsonify({"success": True}), 200
+    return jsonify({'error': 'Unauthorized: user or anon_id not associated with story_id'}), 403
+
+
+def generate_audiobook_text(text_block, story_id, user, anon_id, hume_client, voice_id, voice_speed, retries):
     try:
         utterances=[
             PostedUtterance(
-                text=surplus_text_queue,
+                text=text_block,
                 voice=PostedUtteranceVoiceWithId(id=voice_id, provider='HUME_AI',),
                 speed=voice_speed,
-                description=get_acting_instructions(surplus_text_queue),
+                description=get_acting_instructions(text_block, story_id, user, anon_id),
             )
         ]
         response = hume_client.tts.synthesize_file_streaming(utterances=utterances)
-        return response
+        
+        if response:
+            log_api_usage(
+                user=user,
+                anon_id=anon_id,
+                provider='hume_ai',
+                model='hume_ai',
+                prompt_tokens=0,
+                completion_tokens=len(text_block),
+                story_id=story_id,
+                endpoint='generate_audiobook_text'
+            )
+            return response
+        elif retries:
+            print(f'No response from generate audio surplus text. Retrying... [{retries}] attempted text block snippet: {text_block[:80]}')
+            return generate_audiobook_text(text_block, story_id, user, anon_id, hume_client, voice_id, voice_speed, retries=retries-1)
+        else:
+            print('Attempted text block FAILED, snippet:', {text_block[:80]})
+            print(f'Response from generate audio surplus text failed. No response received after retries')
     except Exception as e:
-            print(f"❌ Audiobook generation failed: {e}")
-            app.logger.error(f"Hume audiobook generation failed: {e}")
+            if retries:
+                print(f'Failed generate audio surplus text. Retrying... [{retries}] attempted text block snippet: {text_block[:80]}')
+                return generate_audiobook_text(text_block, story_id, user, anon_id, hume_client, voice_id, voice_speed, retries=retries-1)
+            else:
+                print(f"❌ Audiobook generation failed after retries: {e}")
+                app.logger.error(f"Hume story block audio generation failed: {e}")
     return None
     
 
@@ -99,12 +155,11 @@ def generate_audio_surplus_text(surplus_text_queue, hume_client, voice_id, voice
 @app.route('/api/v1/generate_audiobook/<int:story_id>', methods=['POST'])
 def generate_audiobook(story_id):
     print('GENERATE AUDIOBOOK TRIGGERED >>>')
-    user, error = get_user_id()
+    print('STORY ID RECEIVED:', story_id)
+    user, anon_id, error = get_user_id()
     if error and 'anon_id' not in request.headers:
         return error
     user_profile = get_user_profile(user)
-
-    anon_id = request.headers.get('anon_id')
     story_set = get_story(story_id, user, anon_id)
     voice_id = user_profile.get('voice_id', '176a55b1-4468-4736-8878-db82729667c1')
     voice_speed = user_profile.get('voice_speed', 1.0)
@@ -120,15 +175,15 @@ def generate_audiobook(story_id):
         while surplus_text_queue:
             print('Generating from surplus text queue...')
             text_block = surplus_text_queue.pop(0)
-            surplus_response = generate_audio_surplus_text(text_block, hume_client, voice_id, voice_speed)
+            surplus_response = generate_audiobook_text(text_block, story_id, user, anon_id, hume_client, voice_id, voice_speed, retries=3)
             if surplus_response:
                 for chunk in surplus_response:
                     audio_chunks.append(chunk)
 
         # If story block text goes over max char limit, split up story block text into < 5000 char blocks and queue
         max_char_limit = 5000
-        if len(story_text) > max_char_limit - 5:   # 5 character buffer
-            print(f'Text block over max limit, chars: {len(story_text)} / {max_char_limit}' )
+        if len(story_text) > max_char_limit - 10:   # 10 character buffer
+            print(f'Text block over max limit, chars: {len(story_text)} / {max_char_limit - 10}' )
             words = story_text.split()
             current_line = ''
 
@@ -145,20 +200,10 @@ def generate_audiobook(story_id):
                 story_text = surplus_text_queue.pop(0)
 
         try:
-            utterances=[
-                PostedUtterance(
-                    text=story_text,
-                    voice=PostedUtteranceVoiceWithId(id=voice_id, provider='HUME_AI',),
-                    speed=voice_speed,
-                    description=get_acting_instructions(story_block['text']),
-                )
-            ]
-
-            # Stream audio and collect chunks
-            response = hume_client.tts.synthesize_file_streaming(utterances=utterances)
-
-            for chunk in response:
-                audio_chunks.append(chunk)
+            response = generate_audiobook_text(story_text, story_id, user, anon_id, hume_client, voice_id, voice_speed, retries=3)
+            if response:
+                for chunk in response:
+                    audio_chunks.append(chunk)
             
         except Exception as e:
             print(f"❌ Audiobook generation failed: {e}")
@@ -198,10 +243,9 @@ def generate_audiobook(story_id):
     
 @app.route('/api/v1/get_audiobook/<int:story_id>', methods=['GET'])
 def get_audiobook(story_id):
-    user, error = get_user_id()
+    user, anon_id, error = get_user_id()
     if error and 'anon_id' not in request.headers:
         return error
-    anon_id = request.headers.get('anon_id')
     key = ds_client.key('Story', int(story_id))
     entity = ds_client.get(key)
     if not entity:
@@ -211,6 +255,7 @@ def get_audiobook(story_id):
     audiobook_progress = entity.get('audiobook_progress', 0)
     audiobook_duration = entity.get('audiobook_duration', 0)
     return jsonify({
+        'title': entity.get('title'),
         'audiobook_url': audiobook_url, 
         'audiobook_progress': audiobook_progress,
         'audiobook_duration': audiobook_duration
@@ -219,7 +264,7 @@ def get_audiobook(story_id):
 
 @app.route('/api/v1/update_audiobook_progress', methods=['POST'])
 def update_audiobook_progress():
-    user, error = get_user_id()
+    user, anon_id, error = get_user_id()
     if error and "anon_id" not in request.headers:
         return error
     
@@ -245,7 +290,9 @@ def update_audiobook_progress():
 def narrate_hume():
     print(f'NARRATE HUME TRIGGERED: {HUME_API_KEY} >>>')
     try:
+        user, anon_id, error = get_user_id()
         story_text = request.args.get('text')
+        story_id = request.args.get('story_id')
         voice_id = request.args.get('voice_id', '176a55b1-4468-4736-8878-db82729667c1')
         voice_speed = float(request.args.get('voice_speed', 1.0))
 
@@ -258,7 +305,8 @@ def narrate_hume():
                 text=story_text,
                 voice=PostedUtteranceVoiceWithId(id=voice_id, provider='HUME_AI',),
                 speed=voice_speed,
-                description=get_acting_instructions(story_text),
+                description=get_acting_instructions(story_text, story_id, user, anon_id),
+                includeTimestampTypes=["word"]
             )
         ]
 
@@ -268,15 +316,22 @@ def narrate_hume():
             response = hume_client.tts.synthesize_file_streaming(utterances=utterances)
 
             if response:
+                log_api_usage(
+                    user=user,
+                    anon_id=anon_id,
+                    provider='hume_ai',
+                    model='hume_ai',
+                    prompt_tokens=0,
+                    completion_tokens=len(story_text),
+                    story_id=story_id,
+                    endpoint='narrate_hume'
+                )
                 print('Audio Response Received...')
+                for chunk in response:
+                    yield chunk
             else:
                 print('No Audio Response Received')
-            
-            for chunk in response:
-                yield chunk
-
         return Response(generate(), mimetype='audio/mpeg')
-    
 
     except Exception as e:
         print(f'Hume narration failed: {e}')
@@ -284,7 +339,7 @@ def narrate_hume():
         return jsonify({'error': str(e)}), 500
 
 
-def get_acting_instructions(story_text):
+def get_acting_instructions(story_text, story_id, user, anon_id):
     acting_prompt = f"""
     Given this section of a novel, write a one-sentence performance direction describing how it should be spoken
     (tone, pacing, emotion). Keep it short and descriptive, like: "The voice is breathy, aroused, with rising tension."
@@ -301,6 +356,16 @@ def get_acting_instructions(story_text):
             ],
             temperature=0.7
         )
+        log_api_usage(
+            user=user,
+            anon_id=anon_id,
+            provider='openai',
+            model='gpt-4o-mini',
+            prompt_tokens=acting_response.usage.prompt_tokens,
+            completion_tokens=acting_response.usage.completion_tokens,
+            story_id=story_id,
+            endpoint='get_acting_instructions'
+        )
         acting_instructions = acting_response.choices[0].message.content.strip()
         #print('VOICE ACTING INSTRUCTIONS: ', acting_instructions)
         return acting_instructions
@@ -309,10 +374,12 @@ def get_acting_instructions(story_text):
         return 'The voice is breathy, passionate, and romantic.'
 
 
-@app.route('/api/v1/narrate', methods=['GET'])
-def narrate():
+@app.route('/api/v1/narrate_elevenlabs', methods=['GET'])
+def narrate_elevenlabs():
     print(f'NARRATE TRIGGERED ELEVEN LABS: {ELEVEN_API_KEY}>>>')
+    user, anon_id, error = get_user_id()
     story_text = request.args.get('text')
+    story_id = request.args.get('story_id')
     voice_id = request.args.get('voice_id', '176a55b1-4468-4736-8878-db82729667c1')
     voice_speed = float(request.args.get('voice_speed', 1.0))
 
@@ -349,6 +416,17 @@ def narrate():
                 for chunk in r.iter_content(chunk_size=4096):
                     if chunk:
                         yield chunk
+
+            log_api_usage(
+                user=user,
+                anon_id=anon_id,
+                provider='elevenlabs',
+                model='elevenlabs',
+                prompt_tokens=0,
+                completion_tokens=len(story_text),
+                story_id=story_id,
+                endpoint='narrate_elevenlabs'
+            )
         except Exception as e:
             logging.error(f'ElevenLabs narrate failed: {e}')
             return
@@ -384,7 +462,7 @@ def create_checkout_session():
     # Check for Authorization header. Only call get_user_id() if present.
     auth_header = request.headers.get('Authorization')
     if auth_header:
-        user, error = get_user_id()
+        user, anon_id, error = get_user_id()
         if error:
             return error
     else:
@@ -413,9 +491,11 @@ def create_checkout_session():
 
 @app.route("/api/v1/create_customer_portal_session", methods=["POST"])
 def create_customer_portal_session():
-    user, error = get_user_id()
+    user, anon_id, error = get_user_id()
     if error:
         return error
+    data = request.get_json() or {}
+    api_base_url = data.get('api_base_url', "http://localhost:3000")
 
     key = ds_client.key('UserProfile', user)
     profile = ds_client.get(key)
@@ -425,7 +505,7 @@ def create_customer_portal_session():
 
     session = stripe.billing_portal.Session.create(
         customer=customer_id,
-        return_url=os.getenv("FRONTEND_URL", "http://localhost:3000") + "/account_page"
+        return_url=api_base_url + "/account_page"
     )
     return jsonify({"url": session.url})
 
@@ -481,33 +561,6 @@ def stripe_webhook():
             logging.warning("Stripe webhook: No client_reference_id (Firebase UID) found in checkout.session.completed event")
         # fallback: nothing more to do
         return ('', 200)
-    
-    # if event_type == 'checkout.session.expired':
-    #     uid = data_obj.get('client_reference_id')
-    #     if uid:
-    #         # Delete Firebase user
-    #         try:
-    #             firebase_auth.delete_user(uid)
-    #         except Exception as e:
-    #             print(f"Error deleting Firebase user: {e}")
-    #         try:
-    #             # Delete all stories for user
-    #             query = ds_client.query(kind='Story')
-    #             query.add_filter('user', '=', uid)
-    #             keys = [entity.key for entity in query.fetch()]
-    #             if keys:
-    #                 ds_client.delete_multi(keys)
-    #         except Exception as e:
-    #             logging.error(f'Error deleting storeis for user {uid}: {e}')
-    #         try:
-    #             # Delete the user's profile entry
-    #             profile_key = ds_client.key('UserProfile', uid)
-    #             ds_client.delete(profile_key)
-    #         except Exception as e:
-    #             logging.error(f'Error deleting UserProfile for user {uid}: {e}')
-    #     else:
-    #         logging.warning("stripe webhook: No client_reference_id (Firebase UID) found in checkout.session.expired event")
-    #     return ('', 200)
 
     # Handle cancellations or non-payment
     if event_type in ('customer.subscription.deleted', 'customer.subscription.updated'):
@@ -569,8 +622,9 @@ def stripe_webhook():
 
 def get_user_id():
     auth_header = request.headers.get('Authorization')
+    anon_id = request.headers.get('anon_id')
     if not auth_header:
-        return None, (jsonify({"error": "Missing Authorization header"}), 401)
+        return None, anon_id, None
     if auth_header.startswith('Bearer '):
         id_token = auth_header.split('Bearer ')[1]
     else:
@@ -578,15 +632,15 @@ def get_user_id():
     try:
         decoded_token = firebase_auth.verify_id_token(id_token)
         uid = decoded_token['uid']
-        return uid, None
+        return uid, None, None
     except Exception as e:
         logging.error(f"Token verification failed: {e}")
-        return None, (jsonify({"error": "Invalid or expired token"}), 401)
+        return None, anon_id, (jsonify({"error": "Invalid or expired token"}), 401)
     
 
 @app.route('/api/v1/my_stories', methods=['GET'])
 def my_stories():
-    user, error = get_user_id()
+    user, anon_id, error = get_user_id()
     if error:
         return error
     user_stories = get_all_stories_for_user(user)
@@ -631,24 +685,29 @@ def set_timezone():
 
 @app.route('/api/v1/read_story/<int:story_id>', methods=['GET'])
 def read_story(story_id):
-    user, error = get_user_id()
+    user, anon_id, error = get_user_id()
     if error:
         return error
-    anon_id = None
-    if not user:
-        anon_id = request.args.get('anon_id')
     story_set = get_story(int(story_id), user, anon_id)
     if story_set:
+        key = ds_client.key("Story", int(story_id))
+        entity = ds_client.get(key)
+        scroll_position = entity.get('scroll_position', 0)
+        scroll_height = entity.get('scroll_height', 1)
+        scroll_ratio = entity.get('scroll_ratio', 0.0)
         return jsonify({
             "story_id": story_id,
-            "story_set": story_set
+            "story_set": story_set,
+            "scroll_position": scroll_position,
+            "scroll_height": scroll_height,
+            "scroll_ratio": scroll_ratio
         }), 201
     return jsonify({"error": "Story not found"}), 404
 
 
 @app.route('/api/v1/get_user_profile', methods=['GET'])
 def get_user_profile():
-    user, error = get_user_id()
+    user, anon_id, error = get_user_id()
     if error:
         return error
     user_profile = get_user_profile(user)
@@ -657,7 +716,7 @@ def get_user_profile():
 
 @app.route('/api/v1/delete_account', methods=['DELETE'])
 def delete_account():
-    user, error = get_user_id()
+    user, anon_id, error = get_user_id()
     if error:
         return error
     # Cancel Stripe subscription if exists
@@ -705,7 +764,7 @@ def delete_account():
 
 @app.route('/api/v1/update_account', methods=['PUT'])
 def update_account():
-    user, error = get_user_id()
+    user, anon_id, error = get_user_id()
     if error:
         return error
     # Fetch or create the UserProfile entity
@@ -773,7 +832,7 @@ def get_user_profile(user):
 
 @app.route('/api/v1/create_story', methods=['POST'])
 def create_story_api():
-    user, error = get_user_id()
+    user, anon_id, error = get_user_id()
     data = request.get_json()
     if not data:
         return jsonify({"error": "Missing JSON body"}), 400
@@ -783,14 +842,21 @@ def create_story_api():
         anon_id = data.get('anon_id')
         if not anon_id:
             return jsonify({"error": "Missing anon_id for anonymous user."}), 400
-
-    story_id, story_set = create_story(data, user, anon_id)
-    if story_id:
-        return jsonify({
-            "story_id": story_id,
-            "story_set": story_set
-        }), 201
-    return jsonify({"error": "Failed to create story. Please try again."}), 500
+    try:
+        story_id, story_set = create_story(data, user, anon_id)
+        if story_id:
+            return jsonify({
+                "story_id": story_id,
+                "story_set": story_set
+            }), 201
+    except Exception as e:
+        err_str = str(e).lower()
+        user_err_msg = "Could not generate your story right now. Please try again later."
+        if "content_policy" in err_str or "sensitive content" in err_str or "safety system" in err_str:
+            user_err_msg = "Your story settings contain content that can't be generated. Please try adjusting the phrasing or topic."
+        elif "invalid request" in err_str:
+            user_err_msg = "Your story input seems too long or formatted incorrectly. Try simplifying or shortening it."
+        return jsonify({"error": user_err_msg, "debug": str(e)}), 400
 
 
 def create_story(form_data, user=None, anon_id=None):
@@ -809,9 +875,11 @@ def create_story(form_data, user=None, anon_id=None):
         'romantic_interest_personality': form_data.get('romantic_interest_personality'),
         'story': []
     }
-    print()
-    print('STORY_SET START:', story_set)
-    story_set = get_next_story_block(story_set, None)
+    #print()
+    #print('STORY_SET START:', story_set)
+    story_set, err = get_next_story_block(story_set, anon_id, None)
+    if err:
+        raise Exception(err)
 
     if story_set:
         story_set['title'] = story_set['story'][0]['title']
@@ -858,7 +926,7 @@ def save_story_anonymous(story_set, anon_id=None):
 
 @app.route('/api/v1/migrate_anon', methods=['POST'])
 def migrate_anon():
-    user, error = get_user_id()
+    user, anon_id, error = get_user_id()
     if error:
         return error
     data = request.get_json() or {}
@@ -913,7 +981,7 @@ def choose_path():
         print('NO DATA')
         return jsonify({"error": "Missing JSON body"}), 400
     
-    user, error = get_user_id()
+    user, anon_id, error = get_user_id()
     anon_id = None
     print('USER:', user)
     if not user:
@@ -942,7 +1010,7 @@ def choose_path(story_id, form_data, user, anon_id):
     decision = form_data['decision']
     next = form_data['next']
     choice = {'decision': decision, 'next': next}
-    story_set = get_next_story_block(story_set, choice)
+    story_set, err = get_next_story_block(story_set, anon_id, choice)
     update_story_db(story_id, story_set)
     return story_id, story_set
 
@@ -968,7 +1036,7 @@ def start_over():
     if not data:
         return jsonify({"error": "Missing JSON body"}), 400
     
-    user, error = get_user_id()
+    user, anon_id, error = get_user_id()
     anon_id = None
     if not user:
         anon_id = data.get('anon_id')
@@ -1006,7 +1074,7 @@ def go_back():
     if not data:
         return jsonify({"error": "Missing JSON body"}), 400
     
-    user, error = get_user_id()
+    user, anon_id, error = get_user_id()
     anon_id = None
     if not user:
         anon_id = data.get('anon_id')
@@ -1073,7 +1141,7 @@ def delete_anonymous_story(story_id, anon_id):
 
 @app.route('/api/v1/delete_story/<int:story_id>', methods=['DELETE'])
 def delete_story(story_id):
-    user, error = get_user_id()
+    user, anon_id, error = get_user_id()
     if error:
         return error
     
@@ -1198,7 +1266,7 @@ def clean_custom_input(user_input: str, min_length: int = 2) -> str | None:
     return cleaned
 
 
-def get_surprise_selections(user_set, story_set, turn_offs):
+def get_surprise_selections(user_set, story_set, turn_offs, user, anon_id):
     print('GET SURPRISE SELECTIONS TRIGGERED...')
     explicitness_map = {
         "mild": "Mild: Sweet, romantic, fade-to-black intimacy. Focuses on emotion, longing, and gestures.",
@@ -1226,10 +1294,10 @@ def get_surprise_selections(user_set, story_set, turn_offs):
 
     if not selections_needed:
         return user_set, story_set
-    #print()
-    #print('START USER SET:', user_set)
-    #print()
-    #print('SELECT NEEDED:', selections_needed)
+    print()
+    print('START USER SET:', user_set)
+    print()
+    print('SELECT NEEDED:', selections_needed)
     prompt = f"""
     Invent a cohesive set of romance story settings. These will later be used to create a romance novel.
     Pick ONE for each category below, making sure they feel like they belong in the same world and tone. 
@@ -1250,7 +1318,7 @@ def get_surprise_selections(user_set, story_set, turn_offs):
       "romantic_interest_personality": "string"
     }}
     """
-    #print('SURPRISE PROMPT:', prompt)
+    print('SURPRISE PROMPT:', prompt)
     resp = openai_client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
@@ -1260,7 +1328,16 @@ def get_surprise_selections(user_set, story_set, turn_offs):
         temperature=1.0,   # max creativity
         response_format={ "type": "json_object" }
     )
-
+    log_api_usage(
+        user=user,
+        anon_id=anon_id,
+        provider='openai',
+        model='gpt-4o-mini',
+        prompt_tokens=resp.usage.prompt_tokens,
+        completion_tokens=resp.usage.completion_tokens,
+        story_id=story_set.get('story_id'),
+        endpoint='get_surprise_selections'
+    )
     try:
         selections = json.loads(resp.choices[0].message.content)
         if selections:
@@ -1274,12 +1351,13 @@ def get_surprise_selections(user_set, story_set, turn_offs):
                     selections_needed[k] = selections[k]
             mod_user_set = current_selections | selections_needed
             #print('GEN SELECTS:', selections)
-            #print('MOD USER SET:', mod_user_set)
-            
+            print('MOD USER SET:', mod_user_set)
+            print('OpenAI generated SURPRISE selections successfully!')
             return mod_user_set, story_set
     except Exception as e:
         print("❌ Failed to parse surprise selections:", e)
         print("❌ JSON decode failed:", e, "Raw content:", resp.choices[0].message.content)
+    print('OpenAI Failed to generate SURPRISE selections.')
     # include random selection from the regular mapped set, if openai fails
     print('OpenAI failed to return surprise selections, selections is None')
     return user_set, story_set
@@ -1438,9 +1516,9 @@ def map_user_set(story_set):
     return user_set
 
 
-def get_next_story_block(story_set, choice=None):
+def get_next_story_block(story_set, anon_id, choice=None):
     print('GET NEXT STORY BLOCK TRIGGERED...')
-    user, error = get_user_id()
+    user, anon_id, error = get_user_id()
     user_profile = get_user_profile(user)
     turn_offs = user_profile.get('turn_offs')
     turn_offs_description = ''
@@ -1548,7 +1626,7 @@ def get_next_story_block(story_set, choice=None):
             """.strip()
 
     else:
-        user_set, story_set = get_surprise_selections(user_set, story_set, turn_offs)
+        user_set, story_set = get_surprise_selections(user_set, story_set, turn_offs, user, anon_id)
         genre = user_set['genre']
         relationship_type = user_set['relationship_type']
         total_paragraphs = user_set['length']
@@ -1603,41 +1681,48 @@ def get_next_story_block(story_set, choice=None):
 
     """.strip()
 
-    print('PROMPT:', prompt)
-    print('STATIC:', STATIC_SYSTEM_INSTRUCTIONS)
-    print()
-    print('MODERA:', check_moderation(prompt))
-    response = openai_client.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "system", "content": STATIC_SYSTEM_INSTRUCTIONS},
-            {"role": "user", "content": prompt}
-        ],
-        temperature=0.9,
-        response_format={ "type": "json_object" }
-    )
-    #print('RESPONSE:', response)
+    #print('PROMPT:', prompt)
+    #print('STATIC:', STATIC_SYSTEM_INSTRUCTIONS)
+    #print()
+    #print('MODERA:', check_moderation(prompt))
     try:
-        text = response.choices[0].message.content
-        if not text:
-            raise ValueError("OpenAI response returned no content.")
-        story_block = json.loads(text)
+        response = openai_client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": STATIC_SYSTEM_INSTRUCTIONS},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.9,
+            response_format={ "type": "json_object" }
+        )
+        log_api_usage(
+            user=user,
+            anon_id=anon_id,
+            provider='openai',
+            model='gpt-4o',
+            prompt_tokens=response.usage.prompt_tokens,
+            completion_tokens=response.usage.completion_tokens,
+            story_id=story_set.get('story_id'),
+            endpoint='get_next_story_block'
+        )
+        #print('RESPONSE:', response)
+        try:
+            text = response.choices[0].message.content
+            if not text:
+                raise ValueError("OpenAI response returned no content.")
+            story_block = json.loads(text)
+            story_set['story'].append(story_block)
+            return story_set, None
+        
+        except (json.JSONDecodeError, TypeError, ValueError) as e:
+            print("JSON parsing error:", e)
+            print("Response text was:", text)
+            return story_set, e
 
-        # Check token usage
-        if hasattr(response, 'usage') and response.usage:
-            print()
-            print(f"Token usage — prompt: {response.usage.prompt_tokens}, completion: {response.usage.completion_tokens}, total: {response.usage.total_tokens}")
-        else:
-            print("⚠️ Token usage info not available for this response.")
+    except (BadRequestError, APIError, RateLimitError) as e:
+        print("OPENAI ERROR:", e)
+        return story_set, e
 
-    except (json.JSONDecodeError, TypeError, ValueError) as e:
-        print("JSON parsing error:", e)
-        print("Response text was:", text)
-        return story_set
-    story_set['story'].append(story_block)
-    print('CHARS:', len(story_block['text']))
-    print()
-    return story_set
 
 
 def get_full_story(story_id, story_set, user, anon_id):
@@ -1660,6 +1745,54 @@ def check_moderation(input_text: str):
     categories = response.results[0].categories
     #print(response, categories)
     return flagged, categories
+
+
+def log_api_usage(user, anon_id, provider, model, prompt_tokens, completion_tokens, story_id, endpoint):
+    def _log_task():
+        try:
+            entity = datastore.Entity(ds_client.key("TokenUsage"))
+            model_price_map = {
+                'hume_ai': {
+                    'prompt': 0,
+                    'completion': 14/140000                     # $14.00 / 140,000 characters
+                    },
+                'gpt-4o': {
+                    'prompt': 2.5/1000000,                      # $2.50  / 1M tokens
+                    'completion': 10/1000000                    # $10.00 / 1M tokens
+                    },
+                'gpt-4o-mini': {
+                    'prompt': 0.15/1000000,                     # $0.15  / 1M tokens
+                    'completion': 0.6/1000000                   # $0.60  / 1M tokens
+                    },
+                'elevenlabs': {
+                    'prompt': 0,
+                    'completion': 22/400000                     # $22.00 / 200,000 credits (@ 0.5 credits per character)
+                }
+            }
+            if model in model_price_map:
+                cost_usd = (prompt_tokens * model_price_map[model]['prompt']) + (completion_tokens * model_price_map[model]['completion'])
+            else:
+                cost_usd = 0
+                print('model not found in model cost map')
+
+            entity.update({
+                'user_id': user,
+                'anon_id': anon_id,
+                'provider': provider,
+                'model': model,
+                'model_cost': cost_usd,
+                'endpoint': endpoint,
+                'prompt_tokens': prompt_tokens,
+                'tokens_completion': completion_tokens,
+                'timestamp': datetime.now(timezone.utc),
+                'story_id': story_id
+            })
+            print('TOKENS USED:', prompt_tokens + completion_tokens)
+            print('Total Cost:', cost_usd)
+            ds_client.put(entity)
+        except Exception as e:
+            app.logger.error(f"Log API token Usage failed: {e}")
+    threading.Thread(target=_log_task, daemon=True).start()
 
 
 # cron handler to remove non registered account user's stories from database (triggered daily)

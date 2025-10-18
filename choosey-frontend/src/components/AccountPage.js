@@ -16,19 +16,21 @@ function AccountPage({currentUser, userProfile, setUserProfile, apiBaseURL}) {
     const [showDeleteAccountConfirm, setShowDeleteAccountConfirm] = useState(false);
     const [showLoginInfoModal, setShowLoginInfoModal] = useState(false);
     const [mode, setMode] = useState('email');
+    const [errMsg, setErrMsg] = useState('');
 
     const handleManageBilling = async () => {
+        setErrMsg('');
         try {
             const idToken = await currentUser.getIdToken();
             const res = await axios.post(
             `${apiBaseURL}/api/v1/create_customer_portal_session`,
-            {},
+            {'api_base_url': apiBaseURL},
             { headers: { Authorization: `Bearer ${idToken}` } }
             );
             window.location.href = res.data.url;
         } catch (err) {
             console.error("Error creating portal session", err);
-            alert("Could not open billing portal.");
+            setErrMsg("Could not open billing portal. Please try again later.");
         }
         };
 
@@ -48,9 +50,9 @@ function AccountPage({currentUser, userProfile, setUserProfile, apiBaseURL}) {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-
+        setErrMsg('');
         if (!currentUser) {
-            alert('You must be logged in.');
+            setErrMsg("You must be logged in.");
             return;
         }
 
@@ -93,7 +95,7 @@ function AccountPage({currentUser, userProfile, setUserProfile, apiBaseURL}) {
             );
             // Sign out locally
             await signOut(auth);
-            //alert('Account deleted.');
+            setAccountMessage('Account deleted.')
 
             window.location.href = '/';
         } catch (err) {
@@ -103,6 +105,7 @@ function AccountPage({currentUser, userProfile, setUserProfile, apiBaseURL}) {
     };
 
     const handleLogout = async () => {
+        setErrMsg('');
         try {
             await signOut(auth);
                 localStorage.removeItem("postLoginRedirect");
@@ -110,7 +113,7 @@ function AccountPage({currentUser, userProfile, setUserProfile, apiBaseURL}) {
                 window.location.href = '/';
             } catch (err) {
                 console.error(err);
-            alert('Logout failed.');
+                setErrMsg('Logout failed.');
         }
     };
 
@@ -126,7 +129,7 @@ function AccountPage({currentUser, userProfile, setUserProfile, apiBaseURL}) {
     }
 
     return (
-        <div className="menu-container" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '20px 0' }}>
+        <div className="box-container" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '20px 0' }}>
             { userProfile?.sub_status !== 'unlimited' && (
                 <div className='premium-banner'>
                     <>
@@ -141,7 +144,9 @@ function AccountPage({currentUser, userProfile, setUserProfile, apiBaseURL}) {
                     </>
                 </div>
             )}
-
+            {errMsg && (
+                <span style={{color: '#8e5656ff', maxWidth: '400px', marginBottom: '15px'}}>{errMsg}</span>
+            )}
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                 <label htmlFor="name">Name</label>
                 <input className="bubble-input" style={{ marginTop: '5px', marginBottom: '20px' }} type="text" id="name" placeholder="Name" name="name" value={name} onChange={(e) => setName(e.target.value)} />

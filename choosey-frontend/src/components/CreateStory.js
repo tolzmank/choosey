@@ -1,20 +1,23 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, use } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import AgeCheckModal from './AgeCheckModal';
 
 
-function CreateStory({currentUser, userProfile, apiBaseURL, onLoginClick}) {
+function CreateStory({currentUser, userProfile, apiBaseURL, onLoginClick, setCurrentStoryId, setCurrentStoryTitle}) {
     const [showAgeModal, setShowAgeModal] = useState(false);
     const [pendingSpice, setPendingSpice] = useState(null);
 
     const [length, setLength] = useState('quicky');
     const [control, setControl] = useState('');
     const [spice, setSpice] = useState('');
+    const [minAgeMsg, setMinAgeMsg] = useState('');
+    const [errMsg, setErrMsg] = useState('');
 
     const [loading, setLoading] = useState(false);
 
     const handleSelectSpice = (choice) => {
+        setMinAgeMsg('');
         if (choice !== 'hot') {
             setSpice(choice);
             return;
@@ -33,9 +36,9 @@ function CreateStory({currentUser, userProfile, apiBaseURL, onLoginClick}) {
             if (age >= 18) {
                 setSpice(choice);
             } else {
-                alert("You must be 18+ to select explicit stories.");
+                setMinAgeMsg("You must be 18+ to select explicit stories.");
             }
-            } else {
+        } else {
             // logged in but no birthdate
             setPendingSpice(choice);
             setShowAgeModal(true);
@@ -53,13 +56,14 @@ function CreateStory({currentUser, userProfile, apiBaseURL, onLoginClick}) {
     const cancelAge = () => {
         setShowAgeModal(false);
         setPendingSpice(null);
+        setMinAgeMsg("You must be 18+ to select explicit stories.");
     }
 
     const [storyOptions, setStoryOptions] = useState({
-        genre: "suprise",
-        relationshipType: "suprise",
-        persona: "suprise",
-        romanticInterestPersonality: "suprise",
+        genre: "surprise",
+        relationshipType: "surprise",
+        persona: "surprise",
+        romanticInterestPersonality: "surprise",
         customGenre: "",
         customRelationshipType: "",
         customPersona: "",
@@ -78,6 +82,8 @@ function CreateStory({currentUser, userProfile, apiBaseURL, onLoginClick}) {
     const handleCreateStory = async (e) => {
         e.preventDefault();
         setLoading(true);
+        setErrMsg('');
+        //setCurrentStoryTitle('')
         // use logged in user, or anonymous id or create anon id
         let idToken = null;
         let anonId = null;
@@ -105,7 +111,7 @@ function CreateStory({currentUser, userProfile, apiBaseURL, onLoginClick}) {
             { headers: { Authorization: `Bearer ${idToken}` } }
             )
             .then(res => {
-                console.log('Story created:', res.data);
+                //console.log('Story created:', res.data);
                 // navigate to Story Reader View here
                 navigate(`/read_story/${res.data.story_id}`, {
                     state: { storySet: res.data.story_set }
@@ -113,6 +119,7 @@ function CreateStory({currentUser, userProfile, apiBaseURL, onLoginClick}) {
             })
         } catch (err) {
             console.log(err);
+            setErrMsg(err.response?.data?.error);
         } finally {
             setLoading(false);
         }
@@ -127,7 +134,7 @@ function CreateStory({currentUser, userProfile, apiBaseURL, onLoginClick}) {
             </div>
         )}
 
-        <div className="container">
+        <div className="container" style={{marginBottom: '90px'}}>
             <form onSubmit={handleCreateStory}>
             <table>
                 <thead>
@@ -237,6 +244,9 @@ function CreateStory({currentUser, userProfile, apiBaseURL, onLoginClick}) {
                         <option value="medium">Just Enough Heat (Medium)</option>
                         <option value="hot">Turn Up the Heat (Explicit)</option>
                     </select>
+                    {minAgeMsg && (
+                        <p style={{color: '#8e5656ff', maxWidth: '300px', marginBottom: '0px'}}>{minAgeMsg}</p>
+                    )}
                     </td>
                 </tr>
 
@@ -308,7 +318,12 @@ function CreateStory({currentUser, userProfile, apiBaseURL, onLoginClick}) {
                 )}
 
                 <tr>
-                    <td style={{ paddingTop: '20px', marginTop: '10px', paddingBottom: '20px' }}><button className="button" type="submit">Start Adventure</button></td>
+                    <td style={{ paddingTop: '20px', marginTop: '10px', paddingBottom: '20px' }}>
+                        <button className="button" type="submit">Start Adventure</button>
+                        {errMsg && (
+                            <p style={{color: '#8e5656ff', maxWidth: '400px'}}>{errMsg}</p>
+                        )}
+                    </td>
                 </tr>
                 </tbody>
             </table>

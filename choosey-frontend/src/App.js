@@ -13,6 +13,7 @@ import CreateStory from './components/CreateStory';
 import ReaderPage from './components/ReaderPage';
 import SuccessPage from './components/SuccessPage';
 import CancelPage from './components/CancelPage';
+import FullAudiobookBar from './components/FullAudiobookBar';
 
 import axios from 'axios';
 import { auth } from './firebase';
@@ -23,6 +24,14 @@ const apiBaseURL =
     : "http://192.168.4.145:8080";
 
 function App() {
+  const [showAudioBar, setShowAudioBar] = useState(true);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const audioRef = useRef(null);
+  const [currentStoryId, setCurrentStoryId] = useState(null);
+  const [currentStoryTitle, setCurrentStoryTitle] = useState(null);
+  const [isFullAudiobookMode, setIsFullAudioBookMode] = useState(false);
+  const [abUrl, setAbUrl] = useState(null);
+
   const [stories, setStories] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
@@ -37,6 +46,20 @@ function App() {
     }
     return savedTheme === 'dark';
   });
+
+  const getAuthHeaders = async () => {
+    const headers = {};
+    if (currentUser) {
+      const idToken = await currentUser.getIdToken();
+      headers["Authorization"] = `Bearer ${idToken}`;
+    } else {
+      const anonId = localStorage.getItem("anon_id");
+      if (anonId) headers["anon_id"] = anonId;
+    }
+    return headers;
+  };
+
+
 
   // Auth and fetch User data
   useEffect(() => {
@@ -75,7 +98,6 @@ function App() {
     });
   }, []);
 
-
   // Theme toggle
   useEffect(() => {
     if (darkMode) {
@@ -109,23 +131,93 @@ function App() {
   return (
     <Router>
       <Header />
-      <Menu currentUser={currentUser} userProfile={userProfile} darkMode={darkMode} setDarkMode={setDarkMode} onLoginClick={(createAccount=false) => { setStartWithCreateAccount(createAccount); setShowLogin(true); }} />
+      <Menu 
+        currentUser={currentUser} 
+        userProfile={userProfile} 
+        darkMode={darkMode} 
+        setDarkMode={setDarkMode} 
+        showAudioBar={showAudioBar} 
+        setShowAudioBar={setShowAudioBar} 
+        isPlaying={isPlaying}
+        setIsPlaying={setIsPlaying}
+        audioRef={audioRef}
+        currentStoryId={currentStoryId}
+        currentStoryTitle={currentStoryTitle}
+        abUrl={abUrl}
+        onLoginClick={(createAccount=false) => { setStartWithCreateAccount(createAccount); setShowLogin(true); }} 
+      />
 
       <Routes>
         <Route path="/" element={<Navigate to="/create_story" replace />} />
 
-        <Route path="/create_story" element={<CreateStory currentUser={currentUser} userProfile={userProfile} apiBaseURL={apiBaseURL} onLoginClick={(createAccount=false) => { setStartWithCreateAccount(createAccount); setShowLogin(true); }} />} />
+        <Route path="/create_story" element={
+          <CreateStory 
+            currentUser={currentUser} 
+            userProfile={userProfile} 
+            apiBaseURL={apiBaseURL} 
+            setCurrentStoryId={setCurrentStoryId} 
+            setCurrentStoryTitle={setCurrentStoryTitle}
+            onLoginClick={(createAccount=false) => { setStartWithCreateAccount(createAccount); setShowLogin(true); }} 
+          />} 
+        />
         
-        <Route path="/my_stories" element={<MyStories stories={stories} currentUser={currentUser} userProfile={userProfile} setStories={setStories} apiBaseURL={apiBaseURL} onLoginClick={(createAccount=false) => { setStartWithCreateAccount(createAccount); setShowLogin(true); }}/>} />
+        <Route path="/my_stories" element={
+          <MyStories 
+            stories={stories} 
+            currentUser={currentUser} 
+            userProfile={userProfile} 
+            setStories={setStories} 
+            apiBaseURL={apiBaseURL} 
+            setCurrentStoryId={setCurrentStoryId}
+            setCurrentStoryTitle={setCurrentStoryTitle}
+            onLoginClick={(createAccount=false) => { setStartWithCreateAccount(createAccount); setShowLogin(true); }}
+          />} 
+        />
 
         <Route path="/account_page" element={<AccountPage currentUser={currentUser} userProfile={userProfile} setUserProfile={setUserProfile} apiBaseURL={apiBaseURL} />}/>
         
-        <Route path="/read_story/:id" element={<ReaderPage currentUser={currentUser} userProfile={userProfile} darkMode={darkMode} setDarkMode={setDarkMode} apiBaseURL={apiBaseURL} onLoginClick={(createAccount=false) => { setStartWithCreateAccount(createAccount); setShowLogin(true); }} />} />
+        <Route path="/read_story/:id" element={
+          <ReaderPage 
+            currentUser={currentUser} 
+            userProfile={userProfile} 
+            darkMode={darkMode} 
+            setDarkMode={setDarkMode} 
+            apiBaseURL={apiBaseURL}  
+            showAudioBar={showAudioBar} 
+            setShowAudioBar={setShowAudioBar} 
+            isPlaying={isPlaying}
+            setIsPlaying={setIsPlaying}
+            audioRef={audioRef}
+            setCurrentStoryId={setCurrentStoryId}
+            setIsFullAudioBookMode={setIsFullAudioBookMode}
+            currentStoryTitle={currentStoryTitle}
+            setCurrentStoryTitle={setCurrentStoryTitle}
+            onLoginClick={(createAccount=false) => { setStartWithCreateAccount(createAccount); setShowLogin(true); }} 
+          />} 
+        />
         
         <Route path="/success" element={<SuccessPage />} />
         <Route path="/cancel" element={<CancelPage />} />
         
       </Routes>
+
+      <FullAudiobookBar
+        apiBaseURL={apiBaseURL}
+        id={currentStoryId}
+        userProfile={userProfile}
+        isFullAudiobookMode={isFullAudiobookMode}
+        darkMode={darkMode}
+        getAuthHeaders={getAuthHeaders}
+        showAudioBar={showAudioBar}
+        setShowAudioBar={setShowAudioBar}
+        setGlobalIsPlaying={setIsPlaying}
+        setGlobalAudioRef={(ref) => { audioRef.current = ref.current; }}
+        currentStoryTitle={currentStoryTitle}
+        abUrl={abUrl}
+        setAbUrl={setAbUrl}
+        setCurrentStoryTitle={setCurrentStoryTitle}
+      />
+
       {showLogin && (
         <div className="modal-overlay">
           <LoginPage startWithCreateAccount={startWithCreateAccount} onClose={() => setShowLogin(false)} prefill={loginPrefill} />

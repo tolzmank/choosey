@@ -6,35 +6,71 @@ import pauseIcon from "../assets/icons/pause_circle_pink.svg";
 import replayIcon from "../assets/icons/replay_10_pink.svg";
 import forwardIcon from "../assets/icons/forward_10_pink.svg";
 
-const FullAudiobookBar = ({ apiBaseURL, id, userProfile, isFullAudiobookMode, getAuthHeaders, darkMode }) => {
-    const [abUrl, setAbUrl] = useState(null);
+const FullAudiobookBar = ({ 
+    apiBaseURL, 
+    id, 
+    userProfile, 
+    isFullAudiobookMode, 
+    getAuthHeaders, darkMode, 
+    showAudioBar, setShowAudioBar, 
+    setGlobalIsPlaying, 
+    setGlobalAudioRef,
+    currentStoryTitle, setCurrentStoryTitle,
+    abUrl, setAbUrl
+
+}) => {
+
+    //const [abUrl, setAbUrl] = useState(null);
     const [abProgress, setAbProgress] = useState(0);
     const [abLoading, setAbLoading] = useState(false);
-    const audioRef = useRef(null);
-    const saveDebounceRef = useRef(0);
 
+    const audioRef = useRef(null);
     const [isPlaying, setIsPlaying] = useState(false);
+
     const [progress, setProgress] = useState(0);
     const [duration, setDuration] = useState(0);
+    const saveDebounceRef = useRef(0);
+    const [errMsg, setErrMsg] = useState('');
+
+
+    useEffect(() => {
+        if (setGlobalAudioRef) setGlobalAudioRef(audioRef);
+    }, [audioRef, setGlobalAudioRef]);
+
+    useEffect(() => {
+        if (setGlobalIsPlaying) setGlobalIsPlaying(isPlaying);
+    }, [isPlaying, setGlobalIsPlaying]);
+
 
     const fetchAudiobook = async () => {
         if (!isFullAudiobookMode) return;
         try {
-        const headers = await getAuthHeaders();
-        const res = await axios.get(`${apiBaseURL}/api/v1/get_audiobook/${id}`, { headers });
-        if (res.data?.audiobook_url) {
-            setAbUrl(res.data.audiobook_url);
-            setAbProgress(res.data.audiobook_progress || 0);
-        } else {
-            setAbUrl(null);
-        }
+            const headers = await getAuthHeaders();
+            const res = await axios.get(`${apiBaseURL}/api/v1/get_audiobook/${id}`, { headers });
+            if (res.data?.audiobook_url) {
+                setAbUrl(res.data.audiobook_url);
+                // Merge backend and localStorage progress
+                const backendProgress = Number(res.data.audiobook_progress || 0);
+                const localProgress = Number(localStorage.getItem(`abp_${id}`)) || 0;
+                let mergedProgress = Math.max(backendProgress, localProgress);
+                // If backend is ahead by more than 2 seconds, update localStorage and use backend value
+                if (backendProgress > localProgress + 2) {
+                    localStorage.setItem(`abp_${id}`, String(backendProgress));
+                    mergedProgress = backendProgress;
+                }
+                setAbProgress(mergedProgress);
+                setCurrentStoryTitle(res.data.title || '');
+            } else {
+                setAbUrl(null);
+            }
         } catch (e) {
-        console.error("❌ Error fetching audiobook:", e);
-        setAbUrl(null);
+            console.error("❌ Error fetching audiobook:", e);
+            setAbUrl(null);
         }
     };
 
     const generateAudiobook = async () => {
+        setErrMsg('');
         try {
         setAbLoading(true);
         const headers = await getAuthHeaders();
@@ -48,10 +84,10 @@ const FullAudiobookBar = ({ apiBaseURL, id, userProfile, isFullAudiobookMode, ge
         );
         await fetchAudiobook();
         } catch (e) {
-        console.error("❌ Error generating audiobook:", e);
-        alert("We couldn't generate the audiobook yet. Please try again in a moment.");
+            console.error("❌ Error generating audiobook:", e);
+            setErrMsg('Could not generate audiobook narration. Please try again later.');
         } finally {
-        setAbLoading(false);
+            setAbLoading(false);
         }
     };
 
@@ -78,9 +114,10 @@ const FullAudiobookBar = ({ apiBaseURL, id, userProfile, isFullAudiobookMode, ge
     useEffect(() => {
         const audio = audioRef.current;
         if (!audio) return;
-        if (audio && abProgress > 0) {
+        if (audio && abProgress > 0 && !audio._hasSetInitialTime) {
             audio.currentTime = abProgress;
             setProgress(abProgress);
+            audio._hasSetInitialTime = true; // flag to prevent resetting
         }
 
     const handleTime = () => {
@@ -97,7 +134,7 @@ const FullAudiobookBar = ({ apiBaseURL, id, userProfile, isFullAudiobookMode, ge
             if (isPlaying && audio.currentTime > 0) {
             saveProgress(audio.currentTime);
             }
-        }, 10000); // every 10 seconds
+        }, 5000); // every 5 seconds
 
         return () => {
             audio.removeEventListener("timeupdate", handleTime);
@@ -156,36 +193,60 @@ const FullAudiobookBar = ({ apiBaseURL, id, userProfile, isFullAudiobookMode, ge
     if (!isFullAudiobookMode) return null;
 
     return (
-        <div
-            className="full-audio-bar"
-            style={{
-                position: "fixed",
-                bottom: 0,
-                left: 0,
-                right: 0,
-                width: "calc(100% - 40px)",
-                margin: "0 auto",
-                background: darkMode
-                    ? "rgba(28,28,28,0.9)"
-                    : "rgba(240,240,240,0.9)",
-                color: darkMode ? "#fff" : "#000",
-                borderTopLeftRadius: '20px',
-                borderTopRightRadius: '20px',
-                borderBottomLeftRadius: '0px',
-                borderBottomRightRadius: '0px',
-                padding: "10px 20px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: "16px",
-                backdropFilter: "blur(1px)",
-                WebkitBackdropFilter: "blur(1px)",
-            }}
-        >
-            
+        <div className={`full-audio-bar ${showAudioBar ? "visible" : "hidden"}`}>
+
+            <button
+                onClick={() => setShowAudioBar(false)}
+                className="button-menu-gray"
+                style={{
+                position: "absolute",
+                top: "0px",
+                right: "12px",
+                padding: '0px',
+                border: "none",
+                cursor: "pointer",
+                opacity: 0.7
+                }}
+            >
+                <img src="/icons/down_arrow_gray.svg" alt="Hide Audio Bar" className="icon-mobile" style={{ height: 30 }} />
+                <img src="/icons/collapse_gray.svg" alt="Hide Audio Bar" className="icon-desktop" style={{ height: 30 }} />
+            </button>
+
         {abUrl ? (
             <>
-                <audio ref={audioRef} src={abUrl} preload="metadata" />
+                <audio
+                    ref={audioRef}
+                    src={abUrl}
+                    preload="metadata"
+                    style={{ display: "none" }}
+                    onLoadedMetadata={() => {
+                        const audio = audioRef.current;
+                        const saved = Number(localStorage.getItem(`abp_${id}`)) || 0;
+                        if (audio && saved > 0) {
+                            // wait a bit before seeking — fixes iOS timing issue
+                            setTimeout(() => {
+                                try {
+                                    audio.currentTime = saved;
+                                    setProgress(saved);
+                                } catch (err) {
+                                    console.warn("⚠️ Couldn't restore position yet:", err);
+                                }
+                            }, 300);
+                        }
+                    }}
+                    onPlay={() => {
+                        const audio = audioRef.current;
+                        const saved = Number(localStorage.getItem(`abp_${id}`)) || 0;
+                        if (audio && saved > 0 && Math.abs(audio.currentTime - saved) > 2) {
+                            // if playing from start, restore again right after user-triggered play
+                            setTimeout(() => {
+                                audio.currentTime = saved;
+                                setProgress(saved);
+                            }, 300);
+                        }
+                    }}
+                    onTimeUpdate={(e) => saveProgress(e.target.currentTime)}
+                />
 
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flex: 1, gap: "16px"}}>
                     {/* Skip Backward */}
@@ -212,9 +273,9 @@ const FullAudiobookBar = ({ apiBaseURL, id, userProfile, isFullAudiobookMode, ge
                         style={{
                         flex: 1,
                         accentColor: "#FF4F81"
-                        }}
+                    }}
                     />
-
+                    
                     {/* Timestamp */}
                     <div style={{ fontSize: "0.9rem", minWidth: 60, textAlign: "right" }}>
                         {formatTime(progress)} / {formatTime(duration)}
@@ -223,33 +284,36 @@ const FullAudiobookBar = ({ apiBaseURL, id, userProfile, isFullAudiobookMode, ge
              </>
 
 
-
-
         ) : (
-          <button className="button" disabled={abLoading} onClick={generateAudiobook} style={{
-                width: 260,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "10px",          // space between icon and text
-                paddingBottom: '4px', 
-                paddingTop: '4px'
-            }}>
-            
-            {abLoading ? (
-                <>
-                    <div className="loading-spinner small_white"></div>
-                    Generating...
-                </>
-                ) : (
-                    <>
-                    <img src={playIconWhite} style={{height: '30px', verticalAlign: "middle"}}/>
-                    Generate Full Audiobook
-                    </>
-                    )}
-          </button>
-        )}
-      </div>
+            <div style={{display: 'flex', alignItems: 'center', gap: '15px'}}>
+                <button className="button" disabled={abLoading} onClick={generateAudiobook} style={{
+                        width: 260,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "10px",          // space between icon and text
+                        paddingBottom: '4px', 
+                        paddingTop: '4px'
+                    }}>
+                    
+                    {abLoading ? (
+                        <>
+                            <div className="loading-spinner small_white"></div>
+                            Generating...
+                        </>
+                        ) : (
+                            <>
+                            <img src={playIconWhite} style={{height: '30px', verticalAlign: "middle"}}/>
+                            Generate Full Audiobook
+                            </>
+                            )}
+                </button>
+                {errMsg && (
+                    <span style={{color: '#8e5656ff', maxWidth: '300px'}}>{errMsg}</span>
+                )}
+            </div>
+            )}
+        </div>
   );
 };
 
