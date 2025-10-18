@@ -212,7 +212,7 @@ select {
   align-items: center;
   gap: 0px;
   position: absolute;
-  top: 2px;
+  top: 3px;
   right: 10px;
   z-index: 120;
   padding: 0px;

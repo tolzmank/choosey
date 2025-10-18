@@ -24,7 +24,7 @@ function AccountPage({currentUser, userProfile, setUserProfile, apiBaseURL}) {
             const idToken = await currentUser.getIdToken();
             const res = await axios.post(
             `${apiBaseURL}/api/v1/create_customer_portal_session`,
-            {'api_base_url': apiBaseURL},
+            {'api_base_url': window.location.origin},
             { headers: { Authorization: `Bearer ${idToken}` } }
             );
             window.location.href = res.data.url;

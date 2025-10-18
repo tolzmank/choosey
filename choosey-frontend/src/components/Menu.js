@@ -47,7 +47,7 @@ function Menu({
 
             {!showAudioBar && (
                 <div className="mini-audio-controls">
-                    <div className="button-menu-gray" style={{ display: "flex", flexDirection: "column", alignItems: "center", height: "65px" }}>
+                    <div className="button-menu-gray" style={{ display: "flex", flexDirection: "column", alignItems: "center", height: "62px" }}>
 
                     {/* Play / Pause Circle */}
                     <button

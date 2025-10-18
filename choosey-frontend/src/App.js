@@ -18,10 +18,12 @@ import FullAudiobookBar from './components/FullAudiobookBar';
 import axios from 'axios';
 import { auth } from './firebase';
 import { signInWithEmailAndPassword, onAuthStateChanged } from 'firebase/auth';
-const apiBaseURL =
-  window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
-    ? "http://127.0.0.1:8080"
-    : "http://192.168.4.145:8080";
+// const apiBaseURL =
+//   window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+//     ? "http://127.0.0.1:8080"
+//     : "http://192.168.4.145:8080";
+
+const apiBaseURL = "https://choosey-473722.uc.r.appspot.com/"
 
 function App() {
   const [showAudioBar, setShowAudioBar] = useState(true);

@@ -16,6 +16,8 @@ load_dotenv()
 
 import stripe
 
+CHOOSEY_FRONTEND_BASE_URL = "http://192.168.4.145:3000"
+
 # Google Cloud Datastore
 from google.cloud import datastore, secretmanager
 ds_client = datastore.Client(project="choosey-473722")
@@ -495,7 +497,8 @@ def create_customer_portal_session():
     if error:
         return error
     data = request.get_json() or {}
-    api_base_url = data.get('api_base_url', "http://localhost:3000")
+    api_base_url = data.get('api_base_url', CHOOSEY_FRONTEND_BASE_URL)
+    print('BASE URL USED:', api_base_url)
 
     key = ds_client.key('UserProfile', user)
     profile = ds_client.get(key)
@@ -1795,17 +1798,17 @@ def log_api_usage(user, anon_id, provider, model, prompt_tokens, completion_toke
     threading.Thread(target=_log_task, daemon=True).start()
 
 
-# cron handler to remove non registered account user's stories from database (triggered daily)
-@app.route('/cron/cleanup_anonymous', methods=['GET'])
-def cleanup_anonymous():
-    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
-    q = ds_client.query(kind='Story')
-    q.add_filter('user', '=', None)
-    q.add_filter('created_at', '<', cutoff)
-    keys = [e.key for e in q.fetch()]
-    if keys:
-        ds_client.delete_multi(keys)
-    return ('', 204)
+# # cron handler to remove non registered account user's stories from database (triggered daily)
+# @app.route('/cron/cleanup_anonymous', methods=['GET'])
+# def cleanup_anonymous():
+#     cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+#     q = ds_client.query(kind='Story')
+#     q.add_filter('user', '=', None)
+#     q.add_filter('created_at', '<', cutoff)
+#     keys = [e.key for e in q.fetch()]
+#     if keys:
+#         ds_client.delete_multi(keys)
+#     return ('', 204)
 
 
 if __name__ == "__main__":

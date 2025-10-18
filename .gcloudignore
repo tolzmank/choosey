@@ -10,12 +10,17 @@ choosey-463422-firebase-adminsdk.json
 tests/
 backups/
 scratch_files/
+archive/
 
 # Ignore legacy files
 app_jinja.py
 templates/
 static/
+choosey-frontend/
 
 # Ignore editor folders
 .vscode/
 .idea/
+
+cron.yaml
+app_jinja.py

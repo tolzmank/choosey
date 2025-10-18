@@ -2,15 +2,23 @@ Flask==3.0.0
 
 requests
 openai
+hume
 
 gunicorn==20.1.0
+
 google-cloud-datastore==2.5.0
+google-cloud-storage
+google-cloud-secret-manager
+
 protobuf==3.20.1
 firebase-admin
 pytz
-google-cloud-secret-manager
+
 python-dotenv
 
 flask-cors
 elevenlabs
 stripe>=10.0.0
+mutagen
+
+python-dotenv
