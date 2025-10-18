@@ -16,7 +16,7 @@ load_dotenv()
 
 import stripe
 
-CHOOSEY_FRONTEND_BASE_URL = "http://192.168.4.145:3000"
+CHOOSEY_FRONTEND_BASE_URL = "https://choosey--choosey-473722.us-central1.hosted.app"
 
 # Google Cloud Datastore
 from google.cloud import datastore, secretmanager
@@ -470,8 +470,8 @@ def create_checkout_session():
     else:
         user = None
     data = request.get_json() or {}
-    success_url = data.get('success_url') or (os.getenv('FRONTEND_URL', 'http://localhost:3000') + '/account_page?success=true')
-    cancel_url = data.get('cancel_url') or (os.getenv('FRONTEND_URL', 'http://localhost:3000') + '/account_page?canceled=true')
+    success_url = data.get('success_url') or (CHOOSEY_FRONTEND_BASE_URL + '/account_page?success=true')
+    cancel_url = data.get('cancel_url') or (CHOOSEY_FRONTEND_BASE_URL + '/account_page?canceled=true')
     if not STRIPE_PRICE_ID:
         return jsonify({'error': 'Stripe price not configured'}), 500
     try:

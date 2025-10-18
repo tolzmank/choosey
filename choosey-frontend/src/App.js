@@ -23,7 +23,7 @@ import { signInWithEmailAndPassword, onAuthStateChanged } from 'firebase/auth';
 //     ? "http://127.0.0.1:8080"
 //     : "http://192.168.4.145:8080";
 
-const apiBaseURL = "https://choosey-473722.uc.r.appspot.com/"
+const apiBaseURL = "https://choosey-473722.uc.r.appspot.com"
 
 function App() {
   const [showAudioBar, setShowAudioBar] = useState(true);
@@ -222,7 +222,7 @@ function App() {
 
       {showLogin && (
         <div className="modal-overlay">
-          <LoginPage startWithCreateAccount={startWithCreateAccount} onClose={() => setShowLogin(false)} prefill={loginPrefill} />
+          <LoginPage apiBaseURL={apiBaseURL} startWithCreateAccount={startWithCreateAccount} onClose={() => setShowLogin(false)} prefill={loginPrefill} />
         </div>
       )}
     </Router>

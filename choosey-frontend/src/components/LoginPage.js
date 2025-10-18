@@ -4,7 +4,7 @@ import { auth, googleProvider } from '../firebase';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup, sendEmailVerification, sendPasswordResetEmail } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
 
-function LoginPage({onClose, startWithCreateAccount = false, prefill = null}) {
+function LoginPage({onClose, apiBaseUrl, startWithCreateAccount = false, prefill = null}) {
     const [showCreateAccount, setShowCreateAccount] = useState(startWithCreateAccount);
     // Initialize state from prefill if provided
     const [email, setEmail] = useState(prefill && prefill.email ? prefill.email : '');
@@ -37,7 +37,7 @@ function LoginPage({onClose, startWithCreateAccount = false, prefill = null}) {
         try {
           const anonId = localStorage.getItem("anon_id");
           if (anonId) {
-            await fetch(`${process.env.REACT_APP_API_BASE_URL || "http://127.0.0.1:8080"}/api/v1/migrate_anon`, {
+            await fetch(`${apiBaseUrl}/api/v1/migrate_anon`, {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
@@ -106,7 +106,7 @@ function LoginPage({onClose, startWithCreateAccount = false, prefill = null}) {
         const idToken = await userCred.user.getIdToken();
 
         // 2. Save profile in Datastore
-        await fetch(`${process.env.REACT_APP_API_BASE_URL || "http://127.0.0.1:8080"}/api/v1/update_account`, {
+        await fetch(`${apiBaseUrl}/api/v1/update_account`, {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
@@ -119,7 +119,7 @@ function LoginPage({onClose, startWithCreateAccount = false, prefill = null}) {
         try {
           const anonId = localStorage.getItem("anon_id");
           if (anonId) {
-            await fetch(`${process.env.REACT_APP_API_BASE_URL || "http://127.0.0.1:8080"}/api/v1/migrate_anon`, {
+            await fetch(`${apiBaseUrl}/api/v1/migrate_anon`, {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
@@ -148,7 +148,7 @@ function LoginPage({onClose, startWithCreateAccount = false, prefill = null}) {
         const idToken = await userCred.user.getIdToken();
 
         // Save basic profile in datastore
-        await fetch(`${process.env.REACT_APP_API_BASE_URL || "http://127.0.0.1:8080"}/api/v1/update_account`, {
+        await fetch(`${apiBaseUrl}/api/v1/update_account`, {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
@@ -163,7 +163,7 @@ function LoginPage({onClose, startWithCreateAccount = false, prefill = null}) {
         // Migrate anon stories
         const anonId = localStorage.getItem("anon_id");
         if (anonId) {
-          await fetch(`${process.env.REACT_APP_API_BASE_URL || "http://127.0.0.1:8080"}/api/v1/migrate_anon`, {
+          await fetch(`${apiBaseUrl}/api/v1/migrate_anon`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -174,7 +174,7 @@ function LoginPage({onClose, startWithCreateAccount = false, prefill = null}) {
           localStorage.removeItem("anon_id");
         }
 
-        const profileRes = await fetch(`${process.env.REACT_APP_API_BASE_URL || "http://127.0.0.1:8080"}/api/v1/get_user_profile`, {
+        const profileRes = await fetch(`${apiBaseUrl}/api/v1/get_user_profile`, {
           method: "GET",
           headers: {
               "Content-Type": "application/json",
@@ -218,7 +218,7 @@ function LoginPage({onClose, startWithCreateAccount = false, prefill = null}) {
 
     const handleGoUnlimited = async () => {
       try {
-        const res = await fetch(`${process.env.REACT_APP_API_BASE_URL || "http://127.0.0.1:8080"}/api/v1/create_checkout_session`, {
+        const res = await fetch(`${apiBaseUrl}/api/v1/create_checkout_session`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

@@ -144,9 +144,7 @@ function AccountPage({currentUser, userProfile, setUserProfile, apiBaseURL}) {
                     </>
                 </div>
             )}
-            {errMsg && (
-                <span style={{color: '#8e5656ff', maxWidth: '400px', marginBottom: '15px'}}>{errMsg}</span>
-            )}
+            
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                 <label htmlFor="name">Name</label>
                 <input className="bubble-input" style={{ marginTop: '5px', marginBottom: '20px' }} type="text" id="name" placeholder="Name" name="name" value={name} onChange={(e) => setName(e.target.value)} />
@@ -218,6 +216,9 @@ function AccountPage({currentUser, userProfile, setUserProfile, apiBaseURL}) {
             <button className="button-gray" style={{ marginTop: '10px' }} onClick={handleLogout} title="Logout">
                 Logout
             </button>
+            {errMsg && (
+                <span style={{color: '#8e5656ff', maxWidth: '400px', marginBottom: '15px'}}>{errMsg}</span>
+            )}
 
             <button type="button" className="button-gray" style={{ marginTop: '30px' }} onClick={() => setShowDeleteAccountConfirm(true)}>
                 Delete Account
