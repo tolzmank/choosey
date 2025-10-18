@@ -4,7 +4,7 @@ import { auth, googleProvider } from '../firebase';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup, sendEmailVerification, sendPasswordResetEmail } from 'firebase/auth';
 import { useNavigate } from 'react-router-dom';
 
-function LoginPage({onClose, apiBaseUrl, startWithCreateAccount = false, prefill = null}) {
+function LoginPage({onClose, apiBaseURL, startWithCreateAccount = false, prefill = null}) {
     const [showCreateAccount, setShowCreateAccount] = useState(startWithCreateAccount);
     // Initialize state from prefill if provided
     const [email, setEmail] = useState(prefill && prefill.email ? prefill.email : '');
@@ -37,7 +37,7 @@ function LoginPage({onClose, apiBaseUrl, startWithCreateAccount = false, prefill
         try {
           const anonId = localStorage.getItem("anon_id");
           if (anonId) {
-            await fetch(`${apiBaseUrl}/api/v1/migrate_anon`, {
+            await fetch(`${apiBaseURL}/api/v1/migrate_anon`, {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
@@ -106,7 +106,7 @@ function LoginPage({onClose, apiBaseUrl, startWithCreateAccount = false, prefill
         const idToken = await userCred.user.getIdToken();
 
         // 2. Save profile in Datastore
-        await fetch(`${apiBaseUrl}/api/v1/update_account`, {
+        await fetch(`${apiBaseURL}/api/v1/update_account`, {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
@@ -119,7 +119,7 @@ function LoginPage({onClose, apiBaseUrl, startWithCreateAccount = false, prefill
         try {
           const anonId = localStorage.getItem("anon_id");
           if (anonId) {
-            await fetch(`${apiBaseUrl}/api/v1/migrate_anon`, {
+            await fetch(`${apiBaseURL}/api/v1/migrate_anon`, {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
@@ -148,7 +148,7 @@ function LoginPage({onClose, apiBaseUrl, startWithCreateAccount = false, prefill
         const idToken = await userCred.user.getIdToken();
 
         // Save basic profile in datastore
-        await fetch(`${apiBaseUrl}/api/v1/update_account`, {
+        await fetch(`${apiBaseURL}/api/v1/update_account`, {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
@@ -163,7 +163,7 @@ function LoginPage({onClose, apiBaseUrl, startWithCreateAccount = false, prefill
         // Migrate anon stories
         const anonId = localStorage.getItem("anon_id");
         if (anonId) {
-          await fetch(`${apiBaseUrl}/api/v1/migrate_anon`, {
+          await fetch(`${apiBaseURL}/api/v1/migrate_anon`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -174,7 +174,7 @@ function LoginPage({onClose, apiBaseUrl, startWithCreateAccount = false, prefill
           localStorage.removeItem("anon_id");
         }
 
-        const profileRes = await fetch(`${apiBaseUrl}/api/v1/get_user_profile`, {
+        const profileRes = await fetch(`${apiBaseURL}/api/v1/get_user_profile`, {
           method: "GET",
           headers: {
               "Content-Type": "application/json",
@@ -218,7 +218,7 @@ function LoginPage({onClose, apiBaseUrl, startWithCreateAccount = false, prefill
 
     const handleGoUnlimited = async () => {
       try {
-        const res = await fetch(`${apiBaseUrl}/api/v1/create_checkout_session`, {
+        const res = await fetch(`${apiBaseURL}/api/v1/create_checkout_session`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
