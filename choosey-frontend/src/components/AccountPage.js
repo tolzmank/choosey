@@ -17,9 +17,11 @@ function AccountPage({currentUser, userProfile, setUserProfile, apiBaseURL}) {
     const [showLoginInfoModal, setShowLoginInfoModal] = useState(false);
     const [mode, setMode] = useState('email');
     const [errMsg, setErrMsg] = useState('');
+    const [loading, setLoading] = useState(false);
 
     const handleManageBilling = async () => {
         setErrMsg('');
+        setLoading(true);
         try {
             const idToken = await currentUser.getIdToken();
             const res = await axios.post(
@@ -30,7 +32,8 @@ function AccountPage({currentUser, userProfile, setUserProfile, apiBaseURL}) {
             window.location.href = res.data.url;
         } catch (err) {
             console.error("Error creating portal session", err);
-            setErrMsg("Could not open billing portal. Please try again later.");
+            setLoading(false);
+            setErrMsg("Could not open subscription management portal. Please try again later.");
         }
         };
 
@@ -144,7 +147,12 @@ function AccountPage({currentUser, userProfile, setUserProfile, apiBaseURL}) {
                     </>
                 </div>
             )}
-            
+                  {loading && (
+        <div className="modal-loading-overlay" style={{}}>
+          <div className="loading-spinner"></div>
+          <p>Loading Subscription Management...</p>
+        </div>
+      )}
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                 <label htmlFor="name">Name</label>
                 <input className="bubble-input" style={{ marginTop: '5px', marginBottom: '20px' }} type="text" id="name" placeholder="Name" name="name" value={name} onChange={(e) => setName(e.target.value)} />
@@ -217,7 +225,7 @@ function AccountPage({currentUser, userProfile, setUserProfile, apiBaseURL}) {
                 Logout
             </button>
             {errMsg && (
-                <span style={{color: '#8e5656ff', maxWidth: '400px', marginBottom: '15px'}}>{errMsg}</span>
+                <span style={{color: '#8e5656ff', maxWidth: '400px', marginBottom: '15px', marginTop: '15px'}}>{errMsg}</span>
             )}
 
             <button type="button" className="button-gray" style={{ marginTop: '30px' }} onClick={() => setShowDeleteAccountConfirm(true)}>

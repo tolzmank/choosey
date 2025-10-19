@@ -15,6 +15,7 @@ function LoginPage({onClose, apiBaseURL, startWithCreateAccount = false, prefill
     const [error, setError] = useState('');
     const [birthdateError, setBirthdateError] = useState('');
     const [displayMsg, setDisplayMsg] = useState('');
+    const [loading, setLoading] = useState(false);
 
     // If prefill changes, update fields (for modal re-opening)
     useEffect(() => {
@@ -218,6 +219,7 @@ function LoginPage({onClose, apiBaseURL, startWithCreateAccount = false, prefill
 
     const handleGoUnlimited = async () => {
       try {
+        setLoading(true);
         const res = await fetch(`${apiBaseURL}/api/v1/create_checkout_session`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -241,6 +243,7 @@ function LoginPage({onClose, apiBaseURL, startWithCreateAccount = false, prefill
 
     return (
         <div className="signup-container">
+
           <h2><button className="button-menu-gray" onClick={() => setShowCreateAccount(true)} style={{ marginTop: '10px', fontWeight: showCreateAccount? 'bold':'normal', color: showCreateAccount? '#999':'#FF4F81'}}>Create Account</button> | <button className="button-menu-gray"  style={{ marginTop: '20px', fontWeight: !showCreateAccount? 'bold':'normal', color: !showCreateAccount? '#999':'#FF4F81' }} onClick={() => setShowCreateAccount(false)}>Login</button></h2>
           
           <button className="button-menu-gray" style={{ paddingTop: '3px', paddingBottom: '15px', borderRadius: '30px', position: 'absolute', top: '10px', right: '10px'}} onClick={onClose}>
@@ -249,6 +252,12 @@ function LoginPage({onClose, apiBaseURL, startWithCreateAccount = false, prefill
 
           {showCreateAccount ? (
             <>
+              {loading && (
+                <div className="modal-loading-overlay" style={{height: '115%'}}>
+                  <div className="loading-spinner"></div>
+                  <p>Connecting to Stripe Payment...</p>
+                </div>
+              )}
                 <h3 style={{marginBottom: '0px'}}>
                   Want more? Of course you do... 
                   <img src="/images/flirty_smiley.png" alt="Flirty Smiley" style={{ height: '20px'}} />
@@ -318,8 +327,7 @@ function LoginPage({onClose, apiBaseURL, startWithCreateAccount = false, prefill
 
           <button className="button-gray" style={{ marginTop: '20px' }} onClick={onClose}>Cancel</button>
 
-          
-      </div>
+        </div>
     );
 }
 

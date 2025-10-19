@@ -498,7 +498,7 @@ def create_customer_portal_session():
         return error
     data = request.get_json() or {}
     api_base_url = data.get('api_base_url', CHOOSEY_FRONTEND_BASE_URL)
-    print('BASE URL USED:', api_base_url)
+    print('API BASE URL USED:', api_base_url)
 
     key = ds_client.key('UserProfile', user)
     profile = ds_client.get(key)

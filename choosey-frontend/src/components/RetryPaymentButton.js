@@ -4,9 +4,11 @@ import { auth } from '../firebase';
 
 function RetryPaymentButton({ apiBaseURL }) {
   const [errMsg, setErrMsg] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleRetryPayment = async () => {
     setErrMsg('');
+    setLoading(true);
     try {
       const user = auth.currentUser;
       if (!user) {
@@ -40,12 +42,18 @@ function RetryPaymentButton({ apiBaseURL }) {
 
   return (
     <>
-    <button className="button" style={{ marginBottom: '30px', marginTop: '0px' }} onClick={handleRetryPayment}>
-      Go to Payment
-    </button>
-    {errMsg && (
-      <span style={{color: '#8e5656ff', maxWidth: '300px'}}>{errMsg}</span>
-    )}
+      {loading && (
+        <div className="modal-loading-overlay" style={{}}>
+          <div className="loading-spinner"></div>
+          <p>Connecting to Stripe Payment...</p>
+        </div>
+      )}
+      <button className="button" style={{ marginBottom: '30px', marginTop: '0px' }} onClick={handleRetryPayment}>
+        Go to Payment
+      </button>
+      {errMsg && (
+        <span style={{color: '#8e5656ff', maxWidth: '300px'}}>{errMsg}</span>
+      )}
     </>
   );
 }
