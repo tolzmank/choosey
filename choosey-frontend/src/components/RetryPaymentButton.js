@@ -8,9 +8,7 @@ function RetryPaymentButton({ apiBaseURL }) {
 
   const handleRetryPayment = async () => {
     setErrMsg('');
-    const timeout = setTimeout(() => {
-      setLoading(false);
-    }, 10000);
+    setLoading(true);
     try {
       const user = auth.currentUser;
       if (!user) {
@@ -33,11 +31,9 @@ function RetryPaymentButton({ apiBaseURL }) {
       );
 
       if (res.data.url) {
-        clearTimeout(timeout);
         window.location.href = res.data.url; // redirect to Stripe Checkout
       }
     } catch (err) {
-      clearTimeout(timeout);
       console.error("Error retrying payment:", err);
       setErrMsg("Could not start payment. Please try again.");
 
