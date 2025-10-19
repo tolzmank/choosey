@@ -21,7 +21,9 @@ function AccountPage({currentUser, userProfile, setUserProfile, apiBaseURL}) {
 
     const handleManageBilling = async () => {
         setErrMsg('');
-        setLoading(true);
+            const timeout = setTimeout(() => {
+                setLoading(false);
+            }, 10000);
         try {
             const idToken = await currentUser.getIdToken();
             const res = await axios.post(
@@ -29,9 +31,11 @@ function AccountPage({currentUser, userProfile, setUserProfile, apiBaseURL}) {
             {'api_base_url': window.location.origin},
             { headers: { Authorization: `Bearer ${idToken}` } }
             );
+            clearTimeout(timeout);
             window.location.href = res.data.url;
         } catch (err) {
             console.error("Error creating portal session", err);
+            clearTimeout(timeout);
             setLoading(false);
             setErrMsg("Could not open subscription management portal. Please try again later.");
         }

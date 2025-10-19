@@ -219,7 +219,9 @@ function LoginPage({onClose, apiBaseURL, startWithCreateAccount = false, prefill
 
     const handleGoUnlimited = async () => {
       try {
-        setLoading(true);
+        const timeout = setTimeout(() => {
+          setLoading(false);
+        }, 10000);
         const res = await fetch(`${apiBaseURL}/api/v1/create_checkout_session`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -231,11 +233,14 @@ function LoginPage({onClose, apiBaseURL, startWithCreateAccount = false, prefill
         });
         const data = await res.json();
         if (data.url) {
+          clearTimeout(timeout);
           window.location.href = data.url; // Stripe Checkout
         } else {
+          clearTimeout(timeout);
           setError(data.error || "Failed to start checkout session");
         }
       } catch (err) {
+        clearTimeout(timeout);
         setError("Error starting checkout: " + err.message);
       }
     };
