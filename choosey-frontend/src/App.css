@@ -100,7 +100,7 @@ select {
   color: #7f7f7f;
   border-radius: 20px;
   box-shadow: 4px 4px 8px rgba(0, 0, 0, 0.2);
-    border-top: 1px solid rgba(255, 255, 255, 0.15);
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
 }
 
 .box-container {
@@ -270,11 +270,11 @@ body.light-theme .full-audio-bar {
 }
 
 .modal-loading-overlay {
-  position: absolute;
+  position: fixed;
   top: 0;
   left: 0;
-  width: 100%;
-  height: 100%;
+  width: 100vw;
+  height: 100dvh;
   background: rgba(25, 25, 25, 0.95);
   z-index: 50;
   display: flex;
@@ -302,7 +302,7 @@ body.light-theme .full-audio-bar {
   flex-direction: column;
   align-items: center;
   padding: 20px;
-  max-height: 80vh;
+  max-height: 80dvh;
   overflow-y: auto;
 
 }

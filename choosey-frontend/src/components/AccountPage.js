@@ -30,6 +30,7 @@ function AccountPage({currentUser, userProfile, setUserProfile, apiBaseURL}) {
             { headers: { Authorization: `Bearer ${idToken}` } }
             );
             window.location.href = res.data.url;
+            setLoading(false);
         } catch (err) {
             console.error("Error creating portal session", err);
             setLoading(false);
@@ -148,7 +149,7 @@ function AccountPage({currentUser, userProfile, setUserProfile, apiBaseURL}) {
                 </div>
             )}
                   {loading && (
-        <div className="modal-loading-overlay" style={{}}>
+        <div className="modal-loading-overlay">
           <div className="loading-spinner"></div>
           <p>Loading Subscription Management...</p>
         </div>

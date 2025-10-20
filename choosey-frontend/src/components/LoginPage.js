@@ -218,8 +218,8 @@ function LoginPage({onClose, apiBaseURL, startWithCreateAccount = false, prefill
     };
 
     const handleGoUnlimited = async () => {
+      setLoading(true);
       try {
-        setLoading(true);
         const res = await fetch(`${apiBaseURL}/api/v1/create_checkout_session`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -232,16 +232,26 @@ function LoginPage({onClose, apiBaseURL, startWithCreateAccount = false, prefill
         const data = await res.json();
         if (data.url) {
           window.location.href = data.url; // Stripe Checkout
+          setLoading(false);
         } else {
           setError(data.error || "Failed to start checkout session");
+          setLoading(false);
         }
       } catch (err) {
         setError("Error starting checkout: " + err.message);
+        setLoading(false);
       }
     };
 
 
     return (
+      <>
+                    {loading && (
+                <div className="modal-loading-overlay">
+                  <div className="loading-spinner"></div>
+                  <p>Connecting to Stripe Payment...</p>
+                </div>
+              )}
         <div className="signup-container">
 
           <h2><button className="button-menu-gray" onClick={() => setShowCreateAccount(true)} style={{ marginTop: '10px', fontWeight: showCreateAccount? 'bold':'normal', color: showCreateAccount? '#999':'#FF4F81'}}>Create Account</button> | <button className="button-menu-gray"  style={{ marginTop: '20px', fontWeight: !showCreateAccount? 'bold':'normal', color: !showCreateAccount? '#999':'#FF4F81' }} onClick={() => setShowCreateAccount(false)}>Login</button></h2>
@@ -252,12 +262,7 @@ function LoginPage({onClose, apiBaseURL, startWithCreateAccount = false, prefill
 
           {showCreateAccount ? (
             <>
-              {loading && (
-                <div className="modal-loading-overlay" style={{height: '115%'}}>
-                  <div className="loading-spinner"></div>
-                  <p>Connecting to Stripe Payment...</p>
-                </div>
-              )}
+
                 <h3 style={{marginBottom: '0px'}}>
                   Want more? Of course you do... 
                   <img src="/images/flirty_smiley.png" alt="Flirty Smiley" style={{ height: '20px'}} />
@@ -328,6 +333,7 @@ function LoginPage({onClose, apiBaseURL, startWithCreateAccount = false, prefill
           <button className="button-gray" style={{ marginTop: '20px' }} onClick={onClose}>Cancel</button>
 
         </div>
+        </>
     );
 }
 
