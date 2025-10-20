@@ -291,15 +291,20 @@ body.light-theme .full-audio-bar {
   max-width: 400px;
   box-sizing: border-box;
   margin: 15px auto;
-  background-color: #1d1d1d;
+  /*background-color: #1d1d1d;*/
   border-radius: 20px;
+  background: rgba(28,28,28,0.9);
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
   box-shadow: 4px 4px 8px rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
   display: flex;
   flex-direction: column;
   align-items: center;
   padding: 20px;
   max-height: 80vh;
   overflow-y: auto;
+
 }
 
 
@@ -874,16 +879,23 @@ label {
   align-items: center;
   z-index: 1000;
   overflow: hidden;
+  backdrop-filter: blur(1px);
 }
 
 .modal-content {
-  background-color: #2f2f2f;
   padding: 20px;
   border-radius: 20px;
   max-width: 400px;
   width: 85%;
+  /*background-color: #2f2f2f;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 4px 4px 8px rgba(0, 0, 0, 0.2);*/
+
+  background: rgba(28,28,28,0.9);
   border-top: 1px solid rgba(255, 255, 255, 0.15);
   box-shadow: 4px 4px 8px rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
 }
 
 body.light-theme .premium-banner {

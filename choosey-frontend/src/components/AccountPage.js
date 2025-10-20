@@ -233,7 +233,7 @@ function AccountPage({currentUser, userProfile, setUserProfile, apiBaseURL}) {
             </button>
     {showDeleteAccountConfirm && (
         <div className="modal-overlay">
-            <div className="modal-content" style={{ backgroundColor: '#2f2f2f' }}>
+            <div className="modal-content">
             <h4>Are you sure?</h4>
             <p>
                 Deleting your account will:

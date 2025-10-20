@@ -70,7 +70,7 @@ const StoryAudioButton = ({storyText, storyId, apiBaseURL, voiceId, voiceSpeed})
     };
 
     return (
-        <div style={{ display: 'flex', alignItems: 'center', marginLeft: '20px', marginBottom: '10px'}}>
+        <div >
             <button onClick={handlePlayPause} className="button-gray" style={{paddingBottom: '4px', paddingTop: '4px', marginRight: '0px'}}>
                 
                 {isLoading ? (

@@ -375,18 +375,22 @@ function ReaderPage({
                 <div key={index}>
                     <div className='story-text'>
                         <br></br>
-                        <p style={{textAlign: 'center', fontSize: `${fontSize}px`, lineHeight: lineSpacing,  marginTop: 10, marginBottom: -10}}><strong>{index+1}</strong></p>
 
-                        <p style={{fontSize: `${fontSize}px`, lineHeight: lineSpacing,  margin: 10}}>
-                            {!isFullAudiobookMode && (
-                            <StoryAudioButton storyText={plotBlock.text} storyId={id} apiBaseURL={apiBaseURL} voiceId={userProfile?.voice_id || "5bb7de05-c8fe-426a-8fcc-ba4fc4ce9f9c"} voiceSpeed={userProfile?.voice_speed || 1.0}/>)} 
-                                {storySet.story.map((block, i) => {
-                                    const paragraphs = block.text.split(/\n\s*\n/); // split by blank lines
-                                    return paragraphs.map((para, j) => (
-                                    <p key={`${i}-${j}`}>{para.trim()}</p>
-                                    ));
-                                })}
+                        <div style={{ /*border: '1px solid rgba(255, 119, 160, 01)',*/ display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative', width: '100%', marginBottom: '10px'}}>
+                            <div style={{marginLeft: '50px', zIndex: 10}}>
+                                {!isFullAudiobookMode && (
+                                    <StoryAudioButton storyText={plotBlock.text} storyId={id} apiBaseURL={apiBaseURL} voiceId={userProfile?.voice_id || "5bb7de05-c8fe-426a-8fcc-ba4fc4ce9f9c"} voiceSpeed={userProfile?.voice_speed || 1.0}/>
+                                )} 
+                            </div>
 
+
+                            <p style={{/*border: '1px solid rgba(255, 119, 160, 01)',*/ borderRadius: '20px', zIndex: 1, width: '100%', textAlign: 'center', fontSize: `${fontSize}px`, lineHeight: lineSpacing,  marginLeft: -120, marginTop: 10, marginBottom: 10}}><strong>{index+1}</strong></p>
+                        </div>
+                        
+                        <p style={{fontSize: `${fontSize}px`, lineHeight: lineSpacing,  margin: 10}}>    
+                            {plotBlock.text.split(/\n\s*\n/).map((para, j) => (
+                                <p key={`${index}-${j}`}>{para.trim()}</p>
+                            ))}
                         </p>
 
                     </div>

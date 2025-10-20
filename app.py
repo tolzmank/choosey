@@ -308,7 +308,6 @@ def narrate_hume():
                 voice=PostedUtteranceVoiceWithId(id=voice_id, provider='HUME_AI',),
                 speed=voice_speed,
                 description=get_acting_instructions(story_text, story_id, user, anon_id),
-                includeTimestampTypes=["word"]
             )
         ]
 
