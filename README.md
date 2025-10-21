@@ -9,7 +9,7 @@ https://choosey-463422.uc.r.appspot.com/
 
 ## 🚀 Live Demo
 
-👉 [Try Choosey on Google App Engine](https://choosey-463422.uc.r.appspot.com/)
+👉 [Try Choosey on Google Firebase](https://choosey--choosey-473722.us-central1.hosted.app/)
 
 ## 📚 Features
 
@@ -42,25 +42,6 @@ choosey/
 └── README.md
 ```
 
-## ⚙️ Running Locally
-
-1. Clone this repo:
-   ```
-   git clone https://github.com/yourusername/choosey.git
-   cd choosey
-   ```
-
-2. Install dependencies:
-   ```
-   pip install -r requirements.txt
-   ```
-
-3. Add your `.env` with necessary environment variables.
-
-4. Run locally:
-   ```
-   python app.py
-   ```
 
 ## 📤 Deployment
 
@@ -72,7 +53,7 @@ gcloud app deploy
 
 ## 📜 License
 
-This project is for educational and demo purposes.
+This project is for demo purposes.
 
 ---
-[Choosey Live](https://choosey-463422.uc.r.appspot.com/)
+[Choosey Live](https://choosey--choosey-473722.us-central1.hosted.app/)
