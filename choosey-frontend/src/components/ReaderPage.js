@@ -95,7 +95,6 @@ function ReaderPage({
 
     const isFullAudiobookMode = localStory?.control === 'full';
 
-
     const anonId = localStory?.anon_id || localStorage.getItem('anon_id');
 
     const lastBlock = localStory?.story?.[localStory?.story.length - 1];
@@ -112,38 +111,28 @@ function ReaderPage({
                 headers["anon_id"] = anonId;
             }
         }
-
         return headers;
     };
-
 
 
     // Refresh story
     useEffect(() => {
         const fetchStory = async () => {
             try {
-                let headers = {};
-
-                if (currentUser) {
-                    const idToken = await currentUser.getIdToken();
-                    headers.Authorization = `Bearer ${idToken}`;
-                } else {
-                    const anonId = localStorage.getItem("anon_id");
-                    if (anonId) {
-                        headers["anon_id"] = anonId;
-                    }
-                }
+                const headers = await getAuthHeaders();
                 const res = await axios.get(`${apiBaseURL}/api/v1/read_story/${id}`, {headers});
-
-                if (res.data && res.data.story_set) {
+                if (res.data.retry) {
+                    setTimeout(fetchStory, 500);
+                }
+                else if (res.data && res.data.story_set) {
                     setLocalStory(res.data.story_set);
                     setCurrentStoryId(res.data.story_set.story_id)
                     setIsFullAudioBookMode(isFullAudiobookMode)
                     setCurrentStoryTitle(res.data.story_set.title)
 
                     // Restore scroll position
-                    const ratio = res.data.scroll_ratio ?? null;
-                    const pos = res.data.scroll_position || localStorage.getItem(`scroll_${res.data.story_set.story_id}`);
+                    const ratio = res.data.story_set.scroll_ratio ?? null;
+                    const pos = res.data.story_set.scroll_position || localStorage.getItem(`scroll_${res.data.story_set.story_id}`);
 
                     if (ratio !== null) {
                         // Wait for DOM render to complete before scrolling
@@ -281,9 +270,9 @@ function ReaderPage({
             try {
                 const headers = await getAuthHeaders();
                 await axios.post(`${apiBaseURL}/api/v1/update_scroll_progress`, {
-                story_id: storyId,
-                scroll_position: scrollPosition,
-                scroll_height: scrollHeight,
+                    story_id: storyId,
+                    scroll_position: scrollPosition,
+                    scroll_height: scrollHeight,
                 }, { headers });
             } catch (err) {
                 console.error("Failed to update scroll progress:", err);
@@ -387,11 +376,11 @@ function ReaderPage({
                             <p style={{/*border: '1px solid rgba(255, 119, 160, 01)',*/ borderRadius: '20px', zIndex: 1, width: '100%', textAlign: 'center', fontSize: `${fontSize}px`, lineHeight: lineSpacing,  marginLeft: -120, marginTop: 10, marginBottom: 10}}><strong>{index+1}</strong></p>
                         </div>
                         
-                        <p style={{fontSize: `${fontSize}px`, lineHeight: lineSpacing,  margin: 10}}>    
+                        <div style={{fontSize: `${fontSize}px`, lineHeight: lineSpacing,  margin: 10}}>    
                             {plotBlock.text.split(/\n\s*\n/).map((para, j) => (
                                 <p key={`${index}-${j}`}>{para.trim()}</p>
                             ))}
-                        </p>
+                        </div>
 
                     </div>
                     {index === localStory.story.length - 1 && plotBlock.choices && (

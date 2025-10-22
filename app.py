@@ -690,19 +690,13 @@ def read_story(story_id):
     user, anon_id, error = get_user_id()
     if error:
         return error
+    if not user and not anon_id:
+        return jsonify({"retry": True}), 202
     story_set = get_story(int(story_id), user, anon_id)
     if story_set:
-        key = ds_client.key("Story", int(story_id))
-        entity = ds_client.get(key)
-        scroll_position = entity.get('scroll_position', 0)
-        scroll_height = entity.get('scroll_height', 1)
-        scroll_ratio = entity.get('scroll_ratio', 0.0)
         return jsonify({
             "story_id": story_id,
-            "story_set": story_set,
-            "scroll_position": scroll_position,
-            "scroll_height": scroll_height,
-            "scroll_ratio": scroll_ratio
+            "story_set": story_set
         }), 201
     return jsonify({"error": "Story not found"}), 404
 
@@ -1227,7 +1221,10 @@ def get_story(story_id, user, anon_id):
             'anon_id': anon_id,
             'audiobook_progress': entity.get('audiobook_progress', 0),
             'audiobook_url': entity.get('audiobook_url'),
-            'audiobook_duration': entity.get('audiobook_duration', 0)
+            'audiobook_duration': entity.get('audiobook_duration', 0),
+            'scroll_position': entity.get('scroll_position', 0),
+            'scroll_height': entity.get('scroll_height', 1),
+            'scroll_ratio': entity.get('scroll_ratio', 0.0)
         }
         #print('STORY SET:', story_set)
         return story_set

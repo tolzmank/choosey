@@ -133,7 +133,7 @@ function AccountPage({currentUser, userProfile, setUserProfile, apiBaseURL}) {
     }
 
     return (
-        <div className="box-container" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '20px 0' }}>
+        <div className="box-container" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '20px 0', paddingBottom: '50px' }}>
             { userProfile?.sub_status !== 'unlimited' && (
                 <div className='premium-banner'>
                     <>
@@ -167,7 +167,7 @@ function AccountPage({currentUser, userProfile, setUserProfile, apiBaseURL}) {
                 <label htmlFor="turn_offs">Turn Offs (Optional)</label>
                 <textarea
                     className="bubble-input"
-                    style={{ height: '100px', marginTop: '5px', marginBottom: '5px' }}
+                    style={{ height: '100px', minWidth: '200px', minHeight: '30px', marginTop: '5px', marginBottom: '5px' }}
                     id="turnOffs"
                     maxLength={200} // Cap at 200 characters
                     placeholder="If you want, briefly describe anything you DO NOT want to see in your stories."
@@ -232,6 +232,7 @@ function AccountPage({currentUser, userProfile, setUserProfile, apiBaseURL}) {
             <button type="button" className="button-gray" style={{ marginTop: '30px' }} onClick={() => setShowDeleteAccountConfirm(true)}>
                 Delete Account
             </button>
+
     {showDeleteAccountConfirm && (
         <div className="modal-overlay">
             <div className="modal-content">

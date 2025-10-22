@@ -42,7 +42,6 @@ function MyStories({stories, currentUser, userProfile, setStories, apiBaseURL, o
     }, [currentUser, apiBaseURL, location.key]);
 
 
-
     const sortedStories = [...(stories || [])].sort((a, b) => {
         let aVal = a[sortKey];
         let bVal = b[sortKey];
@@ -126,10 +125,14 @@ function MyStories({stories, currentUser, userProfile, setStories, apiBaseURL, o
     const renderStories = () => {
         if (currentUser && !userProfile) {
             return (
-                <div id="loading-overlay">
-                <div className="loading-spinner"></div>
-                <p>Loading your stories...</p>
-                </div>
+                <tr>
+                    <td colSpan="4" style={{textAlign: 'center'}}>
+                        <div id="loading-overlay">
+                            <div className="loading-spinner"></div>
+                            <p>Loading your stories...</p>
+                        </div>
+                    </td>
+                </tr>
             );
         }
         if (currentUser) {
