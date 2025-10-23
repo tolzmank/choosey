@@ -122,9 +122,9 @@ function ReaderPage({
                 const headers = await getAuthHeaders();
                 const res = await axios.get(`${apiBaseURL}/api/v1/read_story/${id}`, {headers});
                 if (res.data.retry) {
-                    setTimeout(fetchStory, 500);
-                }
-                else if (res.data && res.data.story_set) {
+                    //setTimeout(fetchStory, 500);
+                    console.log(res.data)
+                } else if (res.data && res.data.story_set) {
                     setLocalStory(res.data.story_set);
                     setCurrentStoryId(res.data.story_set.story_id)
                     setIsFullAudioBookMode(isFullAudiobookMode)
@@ -172,7 +172,7 @@ function ReaderPage({
             }
         };
 
-        if (id) {
+        if (id && (currentUser || localStorage.getItem('anon_id'))) {
             fetchStory();
         }
     }, [id, currentUser]);
@@ -255,35 +255,37 @@ function ReaderPage({
     }, [id, storySet]);
 
     useEffect(() => {
+        const storyId = Number(id);
+        if (!storyId) return;
+        let lastScrollPos = localStorage.getItem(`scroll_${storyId}` || 0);
+
         const handleScroll = async () => {
-            const storyId = Number(id);
-            const scrollPosition = window.scrollY;
+            const scrollPosition = Math.floor(window.scrollY);
             const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
-
-            // Save scroll position to local storage immediately (for speed)
-            localStorage.setItem(`scroll_${storyId}`, scrollPosition);
-
-            // Throttle updates to backend (every 5 seconds)
-            if (saveDebounceRef.current) return;
-            saveDebounceRef.current = setTimeout(async () => {
-            saveDebounceRef.current = null;
-            try {
-                const headers = await getAuthHeaders();
-                await axios.post(`${apiBaseURL}/api/v1/update_scroll_progress`, {
-                    story_id: storyId,
-                    scroll_position: scrollPosition,
-                    scroll_height: scrollHeight,
-                }, { headers });
-            } catch (err) {
-                console.error("Failed to update scroll progress:", err);
-            }
-            }, 5000);
+            //console.log("Current Scroll-Y", scrollPosition);
+            
+            if (Math.abs(scrollPosition - lastScrollPos) > 150) {
+                localStorage.setItem(`scroll_${storyId}`, scrollPosition);
+                lastScrollPos = scrollPosition
+                try {
+                    const headers = await getAuthHeaders();
+                    await axios.post(`${apiBaseURL}/api/v1/update_scroll_progress`, {
+                        story_id: storyId,
+                        scroll_position: scrollPosition,
+                        scroll_height: scrollHeight,
+                    }, { headers });
+                    //console.log("Updated Scroll-Y Position", scrollPosition);
+                } catch (err) {
+                    console.error("Failed to update scroll progress:", err);
+                } 
+            }    
         };
-
-        window.addEventListener("scroll", handleScroll);
+        const interval = setInterval(handleScroll, 5000);
+        const handleBeforeUnload = () => handleScroll();
+        window.addEventListener("beforeunload", handleBeforeUnload);
         return () => {
-            window.removeEventListener("scroll", handleScroll);
-            if (saveDebounceRef.current) clearTimeout(saveDebounceRef.current);
+            clearInterval(interval);
+            window.removeEventListener("beforeunload", handleBeforeUnload);
         };
         }, [id, currentUser]);
 
@@ -371,7 +373,6 @@ function ReaderPage({
                                     <StoryAudioButton storyText={plotBlock.text} storyId={id} apiBaseURL={apiBaseURL} voiceId={userProfile?.voice_id || "5bb7de05-c8fe-426a-8fcc-ba4fc4ce9f9c"} voiceSpeed={userProfile?.voice_speed || 1.0}/>
                                 )} 
                             </div>
-
 
                             <p style={{/*border: '1px solid rgba(255, 119, 160, 01)',*/ borderRadius: '20px', zIndex: 1, width: '100%', textAlign: 'center', fontSize: `${fontSize}px`, lineHeight: lineSpacing,  marginLeft: -120, marginTop: 10, marginBottom: 10}}><strong>{index+1}</strong></p>
                         </div>
