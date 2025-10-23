@@ -49,16 +49,22 @@ const FullAudiobookBar = ({
             const res = await axios.get(`${apiBaseURL}/api/v1/get_audiobook/${id}`, { headers });
             if (res.data?.audiobook_url) {
                 setAbUrl(res.data.audiobook_url);
-                // Merge backend and localStorage progress
+                // Retrieve backend and localStorage progress
                 const backendProgress = Number(res.data.audiobook_progress || 0);
+                const backendUpdated = new Date(res.data.audiobook_last_modified || 0).getTime();
+
                 const localProgress = Number(localStorage.getItem(`abp_${id}`)) || 0;
-                let mergedProgress = Math.max(backendProgress, localProgress);
-                // If backend is ahead by more than 2 seconds, update localStorage and use backend value
-                if (backendProgress > localProgress + 2) {
+                const localUpdated = Number(localStorage.getItem(`abp_${id}_ts`)) || 0;
+
+                let effectiveProgress = localProgress;
+                if (backendUpdated > localUpdated) {
                     localStorage.setItem(`abp_${id}`, String(backendProgress));
-                    mergedProgress = backendProgress;
+                    localStorage.setItem(`abp_${id}_ts`, String(backendUpdated));
+                    effectiveProgress = backendProgress;
+                } else {
+                    effectiveProgress = localProgress
                 }
-                setAbProgress(mergedProgress);
+                setAbProgress(effectiveProgress);
                 setCurrentStoryTitle(res.data.title || '');
             } else {
                 setAbUrl(null);
@@ -94,21 +100,31 @@ const FullAudiobookBar = ({
     const saveProgress = async (seconds) => {
         const now = Date.now();
         if (now - (saveDebounceRef.current || 0) < 5000) return;
-        saveDebounceRef.current = now;
+            saveDebounceRef.current = now;
 
         try {
-        const headers = await getAuthHeaders();
-        const progress = Math.max(0, Math.floor(seconds));
-        localStorage.setItem(`abp_${id}`, String(progress));
-        await axios.post(
-            `${apiBaseURL}/api/v1/update_audiobook_progress`,
-            { story_id: Number(id), progress_in_seconds: progress },
-            { headers }
-        );
+            const headers = await getAuthHeaders();
+            const progress = Math.max(0, Math.floor(seconds));
+            localStorage.setItem(`abp_${id}`, String(progress));
+            localStorage.setItem(`abp_${id}_ts`, String(Date.now()));
+            await axios.post(
+                `${apiBaseURL}/api/v1/update_audiobook_progress`,
+                { story_id: Number(id), progress_in_seconds: progress },
+                { headers }
+            );
         } catch (e) {
-        console.warn("⚠️ Failed to persist audiobook progress:", e);
+            console.warn("⚠️ Failed to persist audiobook progress:", e);
         }
     };
+
+    useEffect(() => {
+        const handleBeforeUnload = () => {
+            const current = audioRef.current?.currentTime || 0;
+            saveProgress(current);
+        };
+        window.addEventListener("beforeunload", handleBeforeUnload);
+        return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+    }, []);
 
     // load + metadata
     useEffect(() => {
@@ -132,9 +148,9 @@ const FullAudiobookBar = ({
         // Periodically sync to backend
         const interval = setInterval(() => {
             if (isPlaying && audio.currentTime > 0) {
-            saveProgress(audio.currentTime);
+                saveProgress(audio.currentTime);
             }
-        }, 5000); // every 5 seconds
+        }, 10000); // every 10 seconds
 
         return () => {
             audio.removeEventListener("timeupdate", handleTime);
@@ -148,9 +164,12 @@ const FullAudiobookBar = ({
         const audio = audioRef.current;
         if (!audio) return;
         if (isPlaying) {
-        audio.pause();
+            audio.pause();
+            if (audio.currentTime > 0) {
+                saveProgress(audio.currentTime);
+            }
         } else {
-        audio.play();
+            audio.play();
         }
         setIsPlaying(!isPlaying);
     };
@@ -184,9 +203,9 @@ const FullAudiobookBar = ({
 
     useEffect(() => {
         if (isFullAudiobookMode) {
-        fetchAudiobook();
+            fetchAudiobook();
         } else {
-        setAbUrl(null);
+            setAbUrl(null);
         }
     }, [isFullAudiobookMode, id, userProfile]);
 
@@ -194,7 +213,6 @@ const FullAudiobookBar = ({
 
     return (
         <div className={`full-audio-bar ${showAudioBar ? "visible" : "hidden"}`}>
-
             <button
                 onClick={() => setShowAudioBar(false)}
                 className="button-menu-gray"
@@ -245,10 +263,32 @@ const FullAudiobookBar = ({
                             }, 300);
                         }
                     }}
-                    onTimeUpdate={(e) => saveProgress(e.target.currentTime)}
+                    onTimeUpdate={(e) => {
+                        const current = e.target.currentTime;
+                        localStorage.setItem(`abp_${id}`, String(Math.floor(current)));
+                    }}
                 />
 
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flex: 1, gap: "16px"}}>
+                <span className="audiobook-title">{currentStoryTitle}</span>
+
+                <div className="audio-progress-time-container">
+                    {/* Progress bar */}
+                    <input
+                        className="audio-progress"
+                        type="range"
+                        min="0"
+                        max={duration || 0}
+                        value={progress}
+                        onChange={handleSeek}
+                    />
+                    {/* Timestamp */}
+                    <div className="audio-timestamp">
+                        <span className="time current-time">{formatTime(progress)}</span>
+                        <span className="time total-time">{formatTime(duration)}</span>
+                    </div>
+                </div>
+
+                <div className="audio-play-pause-skip-container">
                     {/* Skip Backward */}
                     <button onClick={skipBackward} style={{background: "transparent", border: "none", cursor: "pointer", padding: 0, opacity: 1, transition: "opacity 0.2s ease"}} onMouseEnter={(e) => (e.currentTarget.style.opacity = 0.7)} onMouseLeave={(e) => (e.currentTarget.style.opacity = 1)}>
                         <img src={replayIcon} alt="<" style={{height: 28}}/>
@@ -263,26 +303,9 @@ const FullAudiobookBar = ({
                     <button onClick={skipForward} style={{background: "transparent", border: "none", cursor: "pointer", padding: 0, opacity: 1, transition: "opacity 0.2s ease"}} onMouseEnter={(e) => (e.currentTarget.style.opacity = 0.7)} onMouseLeave={(e) => (e.currentTarget.style.opacity = 1)}>
                         <img src={forwardIcon} alt=">" style={{height: 28}}/>
                     </button>
-
-                    {/* Progress bar */}
-                    <input type="range"
-                        min="0"
-                        max={duration || 0}
-                        value={progress}
-                        onChange={handleSeek}
-                        style={{
-                        flex: 1,
-                        accentColor: "#FF4F81"
-                    }}
-                    />
-                    
-                    {/* Timestamp */}
-                    <div style={{ fontSize: "0.9rem", minWidth: 60, textAlign: "right" }}>
-                        {formatTime(progress)} / {formatTime(duration)}
-                    </div>
                 </div>
+   
              </>
-
 
         ) : (
             <div style={{display: 'flex', alignItems: 'center', gap: '15px'}}>

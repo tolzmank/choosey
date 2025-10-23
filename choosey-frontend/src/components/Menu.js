@@ -21,25 +21,25 @@ function Menu({
             <div className="menu-container" style={{display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '10px 0'}}>
                 <Link className="button-menu-gray" style={{marginRight: '5px'}} to="/create_story" title="Start creating a new story">
                     <div className='menu-item'>
-                        <img src="/icons/create_new_pink.svg" alt="Account"  className="menu-icon" style={{height: '40px'}} /><br></br>
+                        <img src="/icons/create_new_pink.svg" alt="Account"  className="menu-icon" /><br></br>
                         <span style={{color: '#7f7f7f'}}>Create</span>
                     </div>
                 </Link>
                 <Link className="button-menu-gray" style={{marginRight: '5px'}} to="/my_stories" title="View all stories you've created">
                     <div className='menu-item'>
-                        <img src="/icons/book2_pink.svg" alt="Account"  className="menu-icon" style={{height: '40px'}} /><br></br>
+                        <img src="/icons/book2_pink.svg" alt="Account"  className="menu-icon" /><br></br>
                         <span style={{color: '#7f7f7f'}}>My Stories</span>
                     </div>
                 </Link>
                 <Link className="button-menu-gray" style={{marginRight: '5px'}} to="/account_page" title="Account Details">
                     <div className='menu-item'>
-                        <img src="/icons/account_circle_pink.svg" alt="Account"  className="menu-icon" style={{height: '40px'}} /><br></br>
+                        <img src="/icons/account_circle_pink.svg" alt="Account"  className="menu-icon" /><br></br>
                         <span style={{color: '#7f7f7f'}}>Account</span>
                     </div>
                 </Link>
                 <button onClick={() => { setDarkMode(!darkMode); localStorage.setItem("darkMode", !darkMode);}} className="button-menu-gray" style={{marginRight: "5px" }}> 
                     <div className='menu-item'>
-                        <img src={darkMode ? "/icons/dark_mode_pink.svg" : "/icons/light_mode_pink.svg"} alt="Toggle Theme" className="menu-icon" style={{height: '40px'}} /><br></br>
+                        <img src={darkMode ? "/icons/dark_mode_pink.svg" : "/icons/light_mode_pink.svg"} alt="Toggle Theme" className="menu-icon" /><br></br>
                         <span style={{color: '#7f7f7f'}}>Theme</span>
                     </div>
                 </button>
@@ -47,7 +47,7 @@ function Menu({
 
             {!showAudioBar && (
                 <div className="mini-audio-controls">
-                    <div className="button-menu-gray" style={{ display: "flex", flexDirection: "column", alignItems: "center", height: "62px" }}>
+                    <div className="button-menu-gray" style={{ display: "flex", flexDirection: "column", alignItems: "center", height: "62px", marginRight: '5px' }}>
 
                     {/* Play / Pause Circle */}
                     <button
@@ -78,7 +78,6 @@ function Menu({
                         <img
                             src={isPlaying ? "/icons/pause_circle_pink.svg" : "/icons/play_circle_pink.svg"}
                             alt={isPlaying ? "Pause" : "Play"}
-                            style={{ height: 40 }}
                         />
                     </button>
 
@@ -93,8 +92,7 @@ function Menu({
                         borderRadius: '5px',
                         cursor: "pointer",
                         padding: 0,
-                        marginTop: '25px',
-                        marginBottom: "-15px",
+                        marginTop: '23px',
                         opacity: 0.8,
                         transition: "opacity 0.2s ease",
                         }}
@@ -102,7 +100,7 @@ function Menu({
                         onMouseLeave={(e) => (e.currentTarget.style.opacity = 0.5)}
                     >
                         <div className='marquee-container'>
-                            <span className='marquee-text' style={{color: '#e8e8e8ff', fontSize: '1em'}}>{currentStoryTitle}</span>
+                            <span className='marquee-text' style={{color: '#e8e8e8ff'}}>{currentStoryTitle}</span>
                         </div>
                         
                     </button>
@@ -120,26 +118,26 @@ function Menu({
         <div className="menu-container" style={{display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '10px 0'}}>
             <Link className="button-menu-gray" style={{marginRight: '5px'}} to="/create_story" title="Start creating a new story">
                 <div className='menu-item'>
-                    <img src="/icons/create_new_pink.svg" alt="Account"  className="menu-icon" style={{height: '100%', height: '40px'}} /><br></br>
+                    <img src="/icons/create_new_pink.svg" alt="Account"  className="menu-icon" /><br></br>
                     <span style={{color: '#7f7f7f'}}>Create</span>
                 </div>
             </Link>
             <Link className="button-menu-gray" style={{marginRight: '5px'}} to="/my_stories" title="View all stories you've created">
                 <div className='menu-item'>
-                    <img src="/icons/book2_pink.svg" alt="Account"  className="menu-icon" style={{height: '100%', height: '40px'}} /><br></br>
+                    <img src="/icons/book2_pink.svg" alt="Account"  className="menu-icon" /><br></br>
                     <span style={{color: '#7f7f7f'}}>My Stories</span>
                 </div>
             </Link>
             <Link className="button-menu-gray" style={{marginRight: '15px'}} onClick={onLoginClick} title="Log in or create your account">
                 <div className='menu-item'>
-                    <img src="/icons/account_circle_pink.svg" alt="Account"  className="menu-icon" style={{height: '100%', height: '40px'}} /><br></br>
+                    <img src="/icons/account_circle_pink.svg" alt="Account"  className="menu-icon" /><br></br>
                     <span style={{color: '#7f7f7f'}}>Account</span>
                 </div>
             </Link>
 
             <button onClick={() => { setDarkMode(!darkMode); localStorage.setItem("darkMode", !darkMode); }} className="button-menu-gray" style={{marginRight: "5px" }}> 
                 <div className='menu-item'>
-                    <img src={darkMode ? "/icons/dark_mode_pink.svg" : "/icons/light_mode_pink.svg"} alt="Toggle Theme" className="menu-icon" style={{height: '100%', height: 40}} /><br></br>
+                    <img src={darkMode ? "/icons/dark_mode_pink.svg" : "/icons/light_mode_pink.svg"} alt="Toggle Theme" className="menu-icon" /><br></br>
                     <span style={{color: '#7f7f7f'}}>Theme</span>
                 </div>
             </button>

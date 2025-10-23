@@ -122,10 +122,11 @@ select {
   width: 100%;
   height: 70px;
   background-color: var(--menu-bg);
-  display: flex;
   border-radius: 20px;
-  justify-content: space-around;
+  display: flex;
+  justify-content: center;
   align-items: center;
+  padding: 10px 0;
   box-shadow: 4px 4px 8px rgba(0, 0, 0, 0.2);
   border-top: 1px solid rgba(255, 255, 255, 0.15);
   background: rgba(28,28,28,0.9);
@@ -150,6 +151,8 @@ select {
     z-index: 100;
   }
 }
+
+
 
 .icon-mobile {
   display: none;
@@ -178,14 +181,14 @@ select {
   right: 0;
   bottom: 0;
   width: calc(100% - 40px);
-  margin: 0 auto;
-  border-radius: 20px;
+
   border-radius: 20px;
   padding: 10px 20px;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+  justify-content: center;
+  gap: 0px;
   background: rgba(28,28,28,0.9);
   border-top: 1px solid rgba(255, 255, 255, 0.15);
   box-shadow: -4px -4px 8px rgba(0, 0, 0, 0.2);
@@ -207,13 +210,47 @@ select {
   transition: transform 0.3s ease, opacity 0.3s ease;
 }
 
+.audio-title-container {
+  width: 100%;
+  /*border: 1px solid #d7d7d7;*/
+}
+
+.audio-progress-time-container {
+  margin-top: 5px;
+  width: 100%;
+  /*border: 1px solid #d7d7d7;*/
+}
+
+.audio-progress {
+  width: calc(100% - 10px);
+  height: 6px;
+  accent-color: #FF4F81;
+  cursor: pointer;
+}
+
+.audio-timestamp {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 5px;
+}
+
+
+.audio-play-pause-skip-container {
+  display: flex;
+  align-items: center;
+  gap: 50px;
+  padding-top: 0px;
+  /*border: 1px solid #d7d7d7;*/
+}
+
+
 .mini-audio-controls {
   display: flex;
   align-items: center;
   gap: 0px;
   position: absolute;
   top: 3px;
-  right: 10px;
+  right: 5px;
   z-index: 120;
   padding: 0px;
 }
@@ -247,6 +284,9 @@ select {
   padding-left: 100%;          /* start off-screen to the right */
   animation: scroll-left 10s linear infinite;
 }
+
+
+
 
 @keyframes scroll-left {
   0% {
@@ -318,6 +358,15 @@ body.light-theme .full-audio-bar {
 .menu-icon {
   height: 40px;
   margin-bottom: -15px;   /* spacing between icon and text */
+}
+
+@media (max-width: 400px) {
+  span {
+    font-size: .85em;
+  }
+  .marquee-container {
+    width: 45px;
+  }
 }
 
 .info-section {

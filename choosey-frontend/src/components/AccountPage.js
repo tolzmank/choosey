@@ -236,15 +236,14 @@ function AccountPage({currentUser, userProfile, setUserProfile, apiBaseURL}) {
     {showDeleteAccountConfirm && (
         <div className="modal-overlay">
             <div className="modal-content">
-            <h4>Are you sure?</h4>
-            <p>
+            <h4 style={{marginBottom: '15px'}}>Are you sure?</h4>
                 Deleting your account will:
                 <ul>
                     <li>Cancel your subscription</li>
                     <li>Permanently delete all your stories</li>
                     <li>Remove your profile</li>
                 </ul>
-            </p>
+
             <div style={{ display: "flex", justifyContent: "space-between", marginTop: "20px" }}>
                 <button className="button" onClick={() => setShowDeleteAccountConfirm(false)}>
                 Cancel

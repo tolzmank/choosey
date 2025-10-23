@@ -238,6 +238,7 @@ def generate_audiobook(story_id):
     entity['audiobook_url'] = blob.public_url
     entity['audiobook_progress'] = 0
     entity['audiobook_duration'] = audio_duration
+    entity['audiobook_last_modified'] = datetime.now(timezone.utc)
     ds_client.put(entity)
     print(f"✅ Audiobook saved to: {blob.public_url}")
     return jsonify({"audiobook_url": blob.public_url}), 200
@@ -253,16 +254,21 @@ def get_audiobook(story_id):
     if not entity:
         return jsonify({"error": "Story not found"}), 404
     
-    audiobook_url = entity.get('audiobook_url')
-    audiobook_progress = entity.get('audiobook_progress', 0)
-    audiobook_duration = entity.get('audiobook_duration', 0)
-    return jsonify({
-        'title': entity.get('title'),
-        'audiobook_url': audiobook_url, 
-        'audiobook_progress': audiobook_progress,
-        'audiobook_duration': audiobook_duration
-        }), 200
-
+    story_user = entity.get('user')
+    story_anon = entity.get('anon_id')
+    if (user and story_user == user) or (anon_id and story_anon == anon_id):
+        audiobook_url = entity.get('audiobook_url')
+        audiobook_progress = entity.get('audiobook_progress', 0)
+        audiobook_duration = entity.get('audiobook_duration', 0)
+        audiobook_last_modified = entity.get('audiobook_last_modified', 0)
+        return jsonify({
+            'title': entity.get('title'),
+            'audiobook_url': audiobook_url, 
+            'audiobook_progress': audiobook_progress,
+            'audiobook_duration': audiobook_duration,
+            'audiobook_last_modified': audiobook_last_modified
+            }), 200
+    return jsonify({"error": "Story not associated with current user or anon_id"}), 401
 
 @app.route('/api/v1/update_audiobook_progress', methods=['POST'])
 def update_audiobook_progress():
@@ -282,10 +288,15 @@ def update_audiobook_progress():
     if not entity:
         return jsonify({"error": "Story not found"}), 404
     
-    entity['audiobook_progress'] = progress
-    print('AUDIOBOOK PROGRESS:', progress)
-    ds_client.put(entity)
-    return jsonify({'success': True}), 200
+    story_user = entity.get('user')
+    story_anon = entity.get('anon_id')
+    if (user and story_user == user) or (anon_id and story_anon == anon_id):
+        entity['audiobook_progress'] = progress
+        entity['audiobook_last_modified'] = datetime.now(timezone.utc)
+        print('AUDIOBOOK PROGRESS:', progress)
+        ds_client.put(entity)
+        return jsonify({'success': True}), 200
+    return jsonify({'error': 'Story not associated with current user or anon_id'}), 401
 
 
 @app.route('/api/v1/narrate_hume', methods=['GET'])

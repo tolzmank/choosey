@@ -327,34 +327,35 @@ function MyStories({stories, currentUser, userProfile, setStories, apiBaseURL, o
     }
 
     return (
-        <table style={{marginBottom: 100}}>
-            <thead>
-                <tr>
-                    <th className='no-sort' style={{paddingRight: '0px', paddingLeft: '7px', paddingTop: '0px'}}>
-                        <img src="/icons/info_white.svg" alt="i" style={{height: '20px', marginTop: '5px'}} />
-                    </th>
-                    <th onClick={() => handleSort('title')} style={{cursor:'pointer', paddingLeft: '5px'}}>
-                        Title {sortKey==='title' ? (sortOrder==='asc'?'▲':'▼') : ''}
-                    </th>
-                    <th onClick={() => handleSort('last_modified')} style={{cursor:'pointer'}}>
-                        Last Modified {sortKey==='last_modified' ? (sortOrder==='asc'?'▲':'▼') : ''}
-                    </th>
-                    <th className="no-sort"></th>
-                </tr>
-            </thead>
-            <tbody>
-                {renderStories()}
-            </tbody>
+        <>
+            <table style={{marginBottom: 100}}>
+                <thead>
+                    <tr>
+                        <th className='no-sort' style={{paddingRight: '0px', paddingLeft: '7px', paddingTop: '0px'}}>
+                            <img src="/icons/info_white.svg" alt="i" style={{height: '20px', marginTop: '5px'}} />
+                        </th>
+                        <th onClick={() => handleSort('title')} style={{cursor:'pointer', paddingLeft: '5px'}}>
+                            Title {sortKey==='title' ? (sortOrder==='asc'?'▲':'▼') : ''}
+                        </th>
+                        <th onClick={() => handleSort('last_modified')} style={{cursor:'pointer'}}>
+                            Last Modified {sortKey==='last_modified' ? (sortOrder==='asc'?'▲':'▼') : ''}
+                        </th>
+                        <th className="no-sort"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {renderStories()}
+                </tbody>
 
 
 
-            {showInfoModal && (
-                <StoryInfoModal
-                    storySet={selectedStory}
-                    onClose={() => setShowInfoModal(false)}
-                />
-            )}
-
+                {showInfoModal && (
+                    <StoryInfoModal
+                        storySet={selectedStory}
+                        onClose={() => setShowInfoModal(false)}
+                    />
+                )}
+            </table>
             {showDeleteConfirm && (
                 <div className="modal-overlay">
                     <div className="modal-content">
@@ -379,9 +380,8 @@ function MyStories({stories, currentUser, userProfile, setStories, apiBaseURL, o
                     </div>
                     </div>
                 </div>
-                )}
-        </table>
-        
+            )}
+        </>
     );
 }
 
