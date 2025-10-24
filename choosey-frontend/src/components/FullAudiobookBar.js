@@ -32,6 +32,10 @@ const FullAudiobookBar = ({
     const saveDebounceRef = useRef(0);
     const [errMsg, setErrMsg] = useState('');
 
+    const startYRef = useRef(null);
+    const currentYRef = useRef(null);
+    const [isDragging, setIsDragging] = useState(false);
+
 
     useEffect(() => {
         if (setGlobalAudioRef) setGlobalAudioRef(audioRef);
@@ -41,6 +45,48 @@ const FullAudiobookBar = ({
         if (setGlobalIsPlaying) setGlobalIsPlaying(isPlaying);
     }, [isPlaying, setGlobalIsPlaying]);
 
+    const handleTouchStart = (e) => {
+        // Ignore if touch started on a control (button, input, slider)
+        const tag = e.target.tagName.toLowerCase();
+        if (['button', 'input'].includes(tag)) return;
+
+        startYRef.current = e.touches[0].clientY;
+        setIsDragging(true);
+    };
+
+    const handleTouchMove = (e) => {
+        if (!isDragging) return;
+        const tag = e.target.tagName.toLowerCase();
+        if (['button', 'input'].includes(tag)) return;
+
+        currentYRef.current = e.touches[0].clientY;
+        const deltaY = currentYRef.current - startYRef.current;
+    
+        // only drag downwards
+        if (deltaY > -20) {
+            // Apply a translation so the bar follows your finger
+            e.currentTarget.style.transform = `translateY(${Math.min(deltaY, 150)}px)`;
+            //e.currentTarget.style.opacity = `${Math.max(0.3, 1 - deltaY / 200)}`;
+        }
+    };
+
+    const handleTouchEnd = (e) => {
+        if (!isDragging) return;
+        const tag = e.target.tagName.toLowerCase();
+        if (['button', 'input'].includes(tag)) return;
+
+        setIsDragging(false);
+        const deltaY = (currentYRef.current || 0) - (startYRef.current || 0);
+
+        // Reset styles
+        e.currentTarget.style.transform = "";
+        e.currentTarget.style.opacity = "";
+
+        // If swipe down enough → hide the bar
+        if (deltaY > 80) {
+            setShowAudioBar(false);
+        }
+    };
 
     const fetchAudiobook = async () => {
         if (!isFullAudiobookMode) return;
@@ -160,19 +206,24 @@ const FullAudiobookBar = ({
         };
         }, [abUrl, isPlaying]);
 
-    const togglePlay = () => {
-        const audio = audioRef.current;
-        if (!audio) return;
-        if (isPlaying) {
-            audio.pause();
-            if (audio.currentTime > 0) {
-                saveProgress(audio.currentTime);
-            }
-        } else {
-            audio.play();
-        }
-        setIsPlaying(!isPlaying);
-    };
+    // const togglePlay = async () => {
+    //     const audio = audioRef.current;
+    //     if (!audio) return;
+    //     if (isPlaying) {
+    //         audio.pause();
+    //         if (audio.currentTime > 0) {
+    //             saveProgress(audio.currentTime);
+    //         }
+    //     } else {
+    //         try {
+    //             await audio.play();
+    //         } catch(err) {
+    //             console.warn("playback blocked - waiting for user gesture", err);
+    //         }
+            
+    //     }
+    //     setIsPlaying(!isPlaying);
+    // };
 
     const handleSeek = (e) => {
         const time = e.target.value;
@@ -212,7 +263,12 @@ const FullAudiobookBar = ({
     if (!isFullAudiobookMode) return null;
 
     return (
-        <div className={`full-audio-bar ${showAudioBar ? "visible" : "hidden"}`}>
+        <div 
+            className={`full-audio-bar ${showAudioBar ? "visible" : "hidden"}`} 
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+        >
             <button
                 onClick={() => setShowAudioBar(false)}
                 className="button-menu-gray"
@@ -236,6 +292,7 @@ const FullAudiobookBar = ({
                     ref={audioRef}
                     src={abUrl}
                     preload="metadata"
+                    playsInline
                     style={{ display: "none" }}
                     onLoadedMetadata={() => {
                         const audio = audioRef.current;
@@ -269,10 +326,7 @@ const FullAudiobookBar = ({
                     }}
                 />
 
-                <button onClick={() => setShowAudioBar(false)} className="button-drag-bar">
-                    <img src="/icons/drag_bar.svg" alt="Hide Audio Bar" className="icon-mobile" style={{ width: '40px', marginTop: '-3px', marginBottom: '15px' }} />
-                </button>
-                
+                <img src="/icons/drag_bar.svg" alt="Hide Audio Bar" className="icon-mobile" style={{ width: '40px', marginTop: '-3px', marginBottom: '15px' }} />
                 <span className="audiobook-title">{currentStoryTitle}</span>
 
                 <div className="audio-progress-time-container">
@@ -299,7 +353,24 @@ const FullAudiobookBar = ({
                     </button>
 
                     {/* Play / Pause button */}
-                    <button onClick={togglePlay} style={{background: "transparent", border: "none", cursor: "pointer", padding: 0, opacity: 1, transition: "opacity 0.2s ease"}} onMouseEnter={(e) => (e.currentTarget.style.opacity = 0.7)} onMouseLeave={(e) => (e.currentTarget.style.opacity = 1)}>
+                    <button 
+                    onClick={() => {
+                        const audio = audioRef.current;
+                        if (!audio) return;
+                        if (isPlaying) {
+                            audio.pause();
+                            if (audio.currentTime > 0) {
+                                saveProgress(audio.currentTime);
+                            }
+                        } else {
+                            audio.play().then(() => setIsPlaying(true)).catch(err => {
+                            console.warn("iOS play blocked:", err);
+                            }); 
+                        }
+                        setIsPlaying(!isPlaying);
+                    }}
+                    
+                    style={{background: "transparent", border: "none", cursor: "pointer", padding: 0, opacity: 1, transition: "opacity 0.2s ease"}} onMouseEnter={(e) => (e.currentTarget.style.opacity = 0.7)} onMouseLeave={(e) => (e.currentTarget.style.opacity = 1)}>
                         <img src={isPlaying ? pauseIcon : playIcon} alt="Play" style={{height: 60}}/>
                     </button>
 

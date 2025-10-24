@@ -1,6 +1,7 @@
 // src/components/Menu.js
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import MiniAudiobookBar from "../components/MiniAudiobookBar";
 
 function Menu({
     currentUser, 

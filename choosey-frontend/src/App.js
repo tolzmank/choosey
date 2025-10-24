@@ -14,6 +14,7 @@ import ReaderPage from './components/ReaderPage';
 import SuccessPage from './components/SuccessPage';
 import CancelPage from './components/CancelPage';
 import FullAudiobookBar from './components/FullAudiobookBar';
+import MiniAudiobookBar from './components/MiniAudiobookBar';
 
 import axios from 'axios';
 import { auth } from './firebase';
@@ -218,6 +219,11 @@ function App() {
         abUrl={abUrl}
         setAbUrl={setAbUrl}
         setCurrentStoryTitle={setCurrentStoryTitle}
+      />
+
+      <MiniAudiobookBar
+        abUrl={abUrl}
+        
       />
 
       {showLogin && (

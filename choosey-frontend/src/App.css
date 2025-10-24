@@ -195,6 +195,8 @@ select {
   backdrop-filter: blur(2px);
   -webkit-backdrop-filter: blur(2px);
   z-index: 90;
+  transition: transform 0.25s ease;/*, opacity 0.25s ease;*/
+  touch-action: none; /* prevent scroll interference */
 }
 
 .full-audio-bar.hidden {
@@ -243,6 +245,10 @@ select {
   /*border: 1px solid #d7d7d7;*/
 }
 
+.mini-audio-bar {
+  transition: transform 0.25s ease, opacity 0.25s ease;
+  touch-action: none;
+}
 
 .mini-audio-controls {
   display: flex;
