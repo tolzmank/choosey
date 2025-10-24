@@ -12,6 +12,7 @@ function CreateStory({currentUser, userProfile, apiBaseURL, onLoginClick, setCur
     const [control, setControl] = useState('');
     const [spice, setSpice] = useState('');
     const [minAgeMsg, setMinAgeMsg] = useState('');
+    //const [explicitnessMsg, setExplicitnessMsg] = useState('');
     const [errMsg, setErrMsg] = useState('');
 
     const [loading, setLoading] = useState(false);
@@ -43,6 +44,29 @@ function CreateStory({currentUser, userProfile, apiBaseURL, onLoginClick, setCur
             setPendingSpice(choice);
             setShowAgeModal(true);
         }
+    };
+
+    const explicitPepperIcons = (explicitness) => {
+        const explicitMap = {
+            'mild': 1,
+            'medium': 2,
+            'hot': 3,
+        }
+        const explicitMsgMap = {
+            'mild': 'Mostly romantic tension and flirty scenes — fade-to-black moments.',
+            'medium': 'Includes detailed foreplay and sensual scenes, but not fully explicit.',
+            'hot': 'Fully explicit adult content with graphic sexual detail.'
+        };
+        let peppers = explicitMap[explicitness] || 0;
+        let explicitMsg = explicitMsgMap[explicitness] || '';
+        return (
+                <div style={{ display: 'flex', gap: '2px', alignItems: 'center', marginTop: '5px' }}>
+                    {Array.from({ length: peppers }).map((_, i) => (
+                        <img key={i} src="/images/pink_pepper_smiley.png" alt="pepper" style={{ height: '20px' }} />
+                    ))}
+                    <p style={{ color:'#db859dff', marginLeft: '5px', marginTop: '0px', marginBottom: '0px'}}>{explicitMsg}</p>
+                </div>
+            );
     };
 
     const confirmAge = () => {
@@ -134,7 +158,7 @@ function CreateStory({currentUser, userProfile, apiBaseURL, onLoginClick, setCur
             </div>
         )}
 
-        <div className="container" style={{marginBottom: '90px'}}>
+        <div className="container" style={{marginBottom: '150px'}}>
             <form onSubmit={handleCreateStory}>
             <table>
                 <thead>
@@ -247,6 +271,7 @@ function CreateStory({currentUser, userProfile, apiBaseURL, onLoginClick, setCur
                     {minAgeMsg && (
                         <p style={{color: '#8e5656ff', maxWidth: '300px', marginBottom: '0px'}}>{minAgeMsg}</p>
                     )}
+                    {explicitPepperIcons(spice)}
                     </td>
                 </tr>
 

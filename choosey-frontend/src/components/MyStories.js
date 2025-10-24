@@ -328,7 +328,7 @@ function MyStories({stories, currentUser, userProfile, setStories, apiBaseURL, o
 
     return (
         <>
-            <table style={{marginBottom: 100}}>
+            <table style={{marginBottom: 150}}>
                 <thead>
                     <tr>
                         <th className='no-sort' style={{paddingRight: '0px', paddingLeft: '7px', paddingTop: '0px'}}>

@@ -321,7 +321,7 @@ function ReaderPage({
                     <img src="/icons/density_decrease.svg" alt="More Spacing" style={{height: 20}}/>
                 </button>
                 
-                <button onClick={() => {
+                {/*<button onClick={() => {
                     setDarkMode(!darkMode);
                     localStorage.setItem("darkMode", !darkMode);
                 }}
@@ -333,30 +333,27 @@ function ReaderPage({
                         className="theme-icon"
                         style={{height: 20}}
                     />
+                </button>*/}
+
+                <button className="button-gray-trans" onClick={() => { setSelectedStory(localStory); setShowInfoModal(true); }} title="Story Info">
+                    <img src="/icons/book1.svg" alt="i" style={{ height: 20 }} />
                 </button>
 
-                <button className="button-gray-trans" onClick={scrollToTop}>
+                <button className="button-gray-trans" onClick={scrollToTop} title="Scroll to Top">
                     <img src="/icons/scroll_top.svg" alt="Scroll to Top" style={{ height: 20 }} />
                 </button>
 
-                <button className="button-gray-trans" onClick={scrollToBottom}>
+                <button className="button-gray-trans" onClick={scrollToBottom} title="Scroll to Bottom">
                     <img src="/icons/scroll_bottom.svg" alt="Scroll to Bottom" style={{ height: 20 }} />
                 </button>
             </div>
+            
 
 
             <div style={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '10px'}}>
-            <button className='button-menu' onClick={() => { setSelectedStory(localStory); setShowInfoModal(true); }} title="Story Info"
-                style={{
-                    background: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    padding: 0,
-                    display: 'flex',
-                    alignItems: 'center'
-                }}
+            <button className='button-gray-trans' onClick={() => { setSelectedStory(localStory); setShowInfoModal(true); }} title="Story Info"
             >
-                <img src="/icons/book1.svg" alt="i" style={{ height: '25px' }} />  <p style={{ fontWeight: 700, fontSize: 20, marginLeft: '10px'}}>{localStory?.title}</p>
+              <p style={{ fontWeight: 700, fontSize: 20, marginLeft: '10px'}}>{localStory?.title}</p>
             </button>
 
             </div>

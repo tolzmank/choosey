@@ -133,7 +133,7 @@ function AccountPage({currentUser, userProfile, setUserProfile, apiBaseURL}) {
     }
 
     return (
-        <div className="box-container" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '20px 0', paddingBottom: '50px' }}>
+        <div className="box-container" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '20px 0', marginBottom: '150px' }}>
             { userProfile?.sub_status !== 'unlimited' && (
                 <div className='premium-banner'>
                     <>
