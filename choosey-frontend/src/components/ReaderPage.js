@@ -426,15 +426,15 @@ function ReaderPage({
         </div>
         <div className="decision-row">
             <button className="button-gray" style={{marginBottom: 100}} onClick={handleGoBack}>
-                <img src='/icons/undo.svg' alt="Restart story" style={{height: 40}}></img><br></br>
+                <img src='/icons/undo.svg' alt="Undo" style={{height: 40}}></img><br></br>
                 Undo Last Decision
             </button>
             <button className="button-gray" style={{marginBottom: 100}} onClick={() => setShowRestartConfirm(true)} >
-                <img src='/icons/restart.svg' alt="Restart story" style={{height: 40}}></img><br></br>
+                <img src='/icons/restart.svg' alt="Restart" style={{height: 40}}></img><br></br>
                 Restart from Beginning
             </button>
             <button className="button-gray" style={{marginBottom: 100}} onClick={handleReset}>
-                <img src='/icons/close.svg' alt="Restart story" style={{height: 40}}></img><br></br>
+                <img src='/icons/close.svg' alt="Close" style={{height: 40}}></img><br></br>
                 Close Reader
             </button>
         </div>

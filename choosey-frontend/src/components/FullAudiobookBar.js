@@ -269,6 +269,10 @@ const FullAudiobookBar = ({
                     }}
                 />
 
+                <button onClick={() => setShowAudioBar(false)} className="button-drag-bar">
+                    <img src="/icons/drag_bar.svg" alt="Hide Audio Bar" className="icon-mobile" style={{ width: '40px', marginTop: '-3px', marginBottom: '15px' }} />
+                </button>
+                
                 <span className="audiobook-title">{currentStoryTitle}</span>
 
                 <div className="audio-progress-time-container">

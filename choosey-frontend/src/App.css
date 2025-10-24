@@ -492,6 +492,19 @@ body.light-theme .full-audio-bar {
   color: #919191;
 }
 
+.button-drag-bar {
+  background-color: transparent;
+  border: none;
+  color: #FF4F81;
+  padding: 0px;
+  font-size: 16px;
+  border-radius: 15px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background-color 0.15s ease, color 0.15s ease;
+  border-top: 1px solid rgba(28, 28, 28, 0.0);
+}
+
 .button-menu-gray {
   background-color: transparent;
   border: none;
