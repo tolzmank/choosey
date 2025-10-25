@@ -245,11 +245,6 @@ select {
   /*border: 1px solid #d7d7d7;*/
 }
 
-.mini-audio-bar {
-  transition: transform 0.25s ease, opacity 0.25s ease;
-  touch-action: none;
-}
-
 .mini-audio-controls {
   display: flex;
   align-items: center;
@@ -259,6 +254,8 @@ select {
   right: 5px;
   z-index: 120;
   padding: 0px;
+  transition: transform 0.25s ease;
+  touch-action: none;
 }
 
 .mini-audio-controls button {

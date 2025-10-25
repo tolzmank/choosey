@@ -220,11 +220,17 @@ function App() {
         setAbUrl={setAbUrl}
         setCurrentStoryTitle={setCurrentStoryTitle}
       />
+      {!FullAudiobookBar && (
+        <MiniAudiobookBar
+          setShowAudioBar={setShowAudioBar}
+          abUrl={abUrl}
+          audioRef={audioRef}
+          isPlaying={isPlaying}
+          setIsPlaying={setIsPlaying}
+          currentStoryTitle={currentStoryTitle}
+        />
+      )}
 
-      <MiniAudiobookBar
-        abUrl={abUrl}
-        
-      />
 
       {showLogin && (
         <div className="modal-overlay">

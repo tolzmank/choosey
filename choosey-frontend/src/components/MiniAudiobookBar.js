@@ -1,6 +1,12 @@
 import React, { useRef, useState } from "react";
 
-const MiniAudiobookBar = ({ setShowAudioBar }) => {
+const MiniAudiobookBar = ({ 
+    setShowAudioBar,
+    abUrl,
+    audioRef,
+    isPlaying, setIsPlaying,
+    currentStoryTitle
+ }) => {
   const startYRef = useRef(null);
   const currentYRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -12,20 +18,27 @@ const MiniAudiobookBar = ({ setShowAudioBar }) => {
 
   const handleTouchMove = (e) => {
     if (!isDragging) return;
+
     currentYRef.current = e.touches[0].clientY;
     const deltaY = currentYRef.current - startYRef.current;
 
-    // Only respond to upward drags
-    if (deltaY < 0) {
+    // Allow drag down of 15 and up of 150
+    if (deltaY < 15) {
       e.currentTarget.style.transform = `translateY(${Math.max(deltaY, -150)}px)`;
-      e.currentTarget.style.opacity = `${Math.max(0.4, 1 + deltaY / 200)}`;
+      //e.currentTarget.style.opacity = `${Math.max(0.4, 1 + deltaY / 200)}`;
     }
   };
 
   const handleTouchEnd = (e) => {
+    if (!isDragging) return;
     setIsDragging(false);
-    const deltaY = (currentYRef.current || 0) - (startYRef.current || 0);
 
+    const deltaY = ((currentYRef.current ?? startYRef.current) - (startYRef.current ?? 0));
+    // console.log('')
+    // console.log('MINI TOUCH END:')
+    // console.log('currentYRef:', currentYRef.current)
+    // console.log('startYRef:', startYRef.current)
+    // console.log('deltaY:', deltaY)
     e.currentTarget.style.transform = "";
     e.currentTarget.style.opacity = "";
 
@@ -36,35 +49,71 @@ const MiniAudiobookBar = ({ setShowAudioBar }) => {
   };
 
   return (
-    <div
-      className="mini-audio-bar"
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-      style={{
-        position: "fixed",
-        bottom: "0",
-        left: "0",
-        right: "0",
-        height: "60px",
-        background: "rgba(28,28,28,0.9)",
-        borderTop: "1px solid rgba(255,255,255,0.15)",
-        borderTopLeftRadius: "20px",
-        borderTopRightRadius: "20px",
-        transition: "transform 0.25s ease, opacity 0.25s ease",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        touchAction: "none", // prevent scrolling interference
-      }}
+    <div className="mini-audio-controls"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
     >
-      <img
-        src="/icons/drag_bar.svg"
-        alt="Expand Audio Player"
-        style={{ width: "40px", marginTop: "-5px" }}
-      />
-      {/* optional: show current track title, progress, etc. */}
+        
+        <div className="button-menu-gray" style={{ display: "flex", flexDirection: "column", alignItems: "center", height: "62px", marginRight: '5px' }}>
+            <img src="/icons/drag_bar.svg" alt="Expand Audio Player" className="icon-mobile drag-handle" style={{ width: "25px", marginBottom: '5px', marginTop: '-5px' }} />
+            {/* Play / Pause Circle */}
+            <button
+                onClick={() => {
+                    if (abUrl) {
+                        if (audioRef?.current) {
+                            if (isPlaying) {
+                                audioRef.current.pause();
+                                setIsPlaying(false);
+                            } else {
+                                audioRef.current.play();
+                                setIsPlaying(true);
+                            }
+                        }
+                    } else {
+                        setShowAudioBar(true);
+                    }
+                }}
+                className="menu-icon drag-handle"
+                title={isPlaying ? "Pause" : "Play"}
+                style={{
+                background: "transparent",
+                border: "none",
+                cursor: "pointer",
+                }}
+            >
+                <img className="drag-handle"
+                    src={isPlaying ? "/icons/pause_circle_pink.svg" : "/icons/play_circle_pink.svg"}
+                    alt={isPlaying ? "Pause" : "Play"}
+                />
+            </button>
+
+            {/* Show full audio player button */}
+            <button
+                onClick={() => setShowAudioBar(true)}
+                className="show-audio-btn drag-handle"
+                title="Show Audio Player"
+                style={{
+                background: "#484848",
+                border: "none",
+                borderRadius: '5px',
+                cursor: "pointer",
+                padding: 0,
+                marginTop: '23px',
+                opacity: 0.8,
+                transition: "opacity 0.2s ease",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.opacity = 1)}
+                onMouseLeave={(e) => (e.currentTarget.style.opacity = 0.5)}
+            >
+                <div className='marquee-container drag-handle'>
+                    <span className='marquee-text' style={{color: '#e8e8e8ff'}}>{currentStoryTitle}</span>
+                </div>
+                
+            </button>
+        </div>
     </div>
+
   );
 };
 

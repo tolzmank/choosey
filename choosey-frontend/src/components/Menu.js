@@ -47,66 +47,14 @@ function Menu({
 
 
             {!showAudioBar && (
-                <div className="mini-audio-controls">
-                    <div className="button-menu-gray" style={{ display: "flex", flexDirection: "column", alignItems: "center", height: "62px", marginRight: '5px' }}>
-
-                    {/* Play / Pause Circle */}
-                    <button
-                        onClick={() => {
-                            if (abUrl) {
-                                if (audioRef?.current) {
-                                    if (isPlaying) {
-                                        audioRef.current.pause();
-                                        setIsPlaying(false);
-                                    } else {
-                                        audioRef.current.play();
-                                        setIsPlaying(true);
-                                    }
-                                }
-                            } else {
-                                setShowAudioBar(true);
-                            }
-                        }}
-
-                        className="menu-icon"
-                        title={isPlaying ? "Pause" : "Play"}
-                        style={{
-                        background: "transparent",
-                        border: "none",
-                        cursor: "pointer",
-                        }}
-                    >
-                        <img
-                            src={isPlaying ? "/icons/pause_circle_pink.svg" : "/icons/play_circle_pink.svg"}
-                            alt={isPlaying ? "Pause" : "Play"}
-                        />
-                    </button>
-
-                    {/* Show full audio player button */}
-                    <button
-                        onClick={() => setShowAudioBar(true)}
-                        className="show-audio-btn"
-                        title="Show Audio Player"
-                        style={{
-                        background: "#484848",
-                        border: "none",
-                        borderRadius: '5px',
-                        cursor: "pointer",
-                        padding: 0,
-                        marginTop: '23px',
-                        opacity: 0.8,
-                        transition: "opacity 0.2s ease",
-                        }}
-                        onMouseEnter={(e) => (e.currentTarget.style.opacity = 1)}
-                        onMouseLeave={(e) => (e.currentTarget.style.opacity = 0.5)}
-                    >
-                        <div className='marquee-container'>
-                            <span className='marquee-text' style={{color: '#e8e8e8ff'}}>{currentStoryTitle}</span>
-                        </div>
-                        
-                    </button>
-                    </div>
-                </div>
+                <MiniAudiobookBar 
+                    setShowAudioBar={setShowAudioBar}
+                    abUrl={abUrl}
+                    audioRef={audioRef}
+                    isPlaying={isPlaying}
+                    setIsPlaying={setIsPlaying}
+                    currentStoryTitle={currentStoryTitle}
+                />
             )}
 
 
