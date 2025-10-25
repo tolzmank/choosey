@@ -56,7 +56,7 @@ function LoginPage({onClose, apiBaseURL, startWithCreateAccount = false, prefill
         localStorage.removeItem("postLoginRedirect");
         window.location.href = prevPath || "/my_stories";
       } catch (err) {
-        setError(err.message);
+        setError(err.message.replace(/^Firebase:\s*/i, ''));
       }
     };
 
@@ -137,7 +137,7 @@ function LoginPage({onClose, apiBaseURL, startWithCreateAccount = false, prefill
         // Launch Stripe Checkout
         await handleGoUnlimited();
       } catch (err) {
-        setError(err.message);
+        setError(err.message.replace(/^Firebase:\s*/i, ''));
       }
     };
 
@@ -194,7 +194,7 @@ function LoginPage({onClose, apiBaseURL, startWithCreateAccount = false, prefill
           window.location.href = prevPath;
         }
       } catch (err) {
-        setError(err.message);
+        setError(err.message.replace(/^Firebase:\s*/i, ''));
       }
     };
 
@@ -246,12 +246,12 @@ function LoginPage({onClose, apiBaseURL, startWithCreateAccount = false, prefill
 
     return (
       <>
-                    {loading && (
-                <div className="modal-loading-overlay">
-                  <div className="loading-spinner"></div>
-                  <p>Connecting to Stripe Payment...</p>
-                </div>
-              )}
+        {loading && (
+          <div className="modal-loading-overlay">
+            <div className="loading-spinner"></div>
+            <p>Connecting to Stripe Payment...</p>
+          </div>
+        )}
         <div className="signup-container">
 
           <h2><button className="button-menu-gray" onClick={() => setShowCreateAccount(true)} style={{ marginTop: '10px', fontWeight: showCreateAccount? 'bold':'normal', color: showCreateAccount? '#999':'#FF4F81'}}>Create Account</button> | <button className="button-menu-gray"  style={{ marginTop: '20px', fontWeight: !showCreateAccount? 'bold':'normal', color: !showCreateAccount? '#999':'#FF4F81' }} onClick={() => setShowCreateAccount(false)}>Login</button></h2>

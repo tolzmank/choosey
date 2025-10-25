@@ -294,7 +294,8 @@ const FullAudiobookBar = ({
                 <img src="/icons/down_arrow_gray.svg" alt="Hide Audio Bar" className="icon-mobile drag-handle" style={{ height: 30 }} />
                 <img src="/icons/collapse_gray.svg" alt="Hide Audio Bar" className="icon-desktop" style={{ height: 30 }} />
             </button>
-
+            <img src="/icons/drag_bar.svg" alt="Hide Audio Bar" className="icon-mobile drag-handle" style={{ width: '40px', marginTop: '-3px', marginBottom: '15px' }} />
+            <span className="audiobook-title">{currentStoryTitle}</span>
         {abUrl ? (
             <>
                 <audio
@@ -335,8 +336,7 @@ const FullAudiobookBar = ({
                     }}
                 />
 
-                <img src="/icons/drag_bar.svg" alt="Hide Audio Bar" className="icon-mobile drag-handle" style={{ width: '40px', marginTop: '-3px', marginBottom: '15px' }} />
-                <span className="audiobook-title">{currentStoryTitle}</span>
+
 
                 <div className="audio-progress-time-container">
                     {/* Progress bar */}
@@ -391,16 +391,20 @@ const FullAudiobookBar = ({
              </>
 
         ) : (
-            <div style={{display: 'flex', alignItems: 'center', gap: '15px'}}>
+            <div style={{display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px'}}>
                 <button className="button" disabled={abLoading} onClick={generateAudiobook} style={{
                         width: 260,
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        gap: "10px",          // space between icon and text
+                        gap: "10px",
                         paddingBottom: '4px', 
-                        paddingTop: '4px'
-                    }}>
+                        paddingTop: '4px',
+                        marginTop: '8px',
+                        marginBottom: '10px'
+                    }}
+                    title='Layback Control Mode generates a full audiobook in one step, just like the initial story generation.'
+                    >
                     
                     {abLoading ? (
                         <>
@@ -414,10 +418,13 @@ const FullAudiobookBar = ({
                             </>
                             )}
                 </button>
-                {errMsg && (
+
+                {errMsg &&  (
                     <span style={{color: '#8e5656ff', maxWidth: '300px'}}>{errMsg}</span>
                 )}
+
             </div>
+            
             )}
         </div>
   );
